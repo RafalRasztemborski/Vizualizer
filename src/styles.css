@@ -214,14 +214,14 @@ input[type='range'] {
 
 .routeSelects {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 90px 58px;
   gap: 6px;
   align-items: end;
 }
 
 .routeControls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 54px 54px 38px 30px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   align-items: end;
 }
@@ -232,8 +232,17 @@ input[type='range'] {
 }
 
 .route label span {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
   color: #a8b7ba;
   font-size: 10px;
+}
+
+.route label b {
+  color: #dce8e9;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .route select {

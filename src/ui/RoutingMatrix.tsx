@@ -1,4 +1,11 @@
-import type { NumericRecord, RouteMapping } from '../core/types';
+import type { NumericRecord, RouteMapping, RouteProcessor } from '../core/types';
+
+const PROCESSORS: RouteProcessor[] = ['raw', 'lerp', 'envelope', 'spring'];
+
+type RouteControlProps = {
+  route: RouteMapping;
+  onChange: (route: RouteMapping) => void;
+};
 
 type Props = {
   routes: RouteMapping[];
@@ -9,6 +16,131 @@ type Props = {
   onChange: (route: RouteMapping) => void;
   onRemove: (id: string) => void;
 };
+
+function RangeControl({
+  label,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label>
+      <span>
+        {label}
+        <b>{value.toFixed(step < 0.01 ? 3 : 2)}</b>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function NumberControl({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="number"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function ProcessorControls({ route, onChange }: RouteControlProps) {
+  if (route.processor === 'raw') {
+    return null;
+  }
+
+  if (route.processor === 'lerp') {
+    return (
+      <RangeControl
+        label="Smooth"
+        min={0.01}
+        max={1}
+        step={0.01}
+        value={route.smoothing}
+        onChange={(value) => onChange({ ...route, smoothing: value })}
+      />
+    );
+  }
+
+  if (route.processor === 'envelope') {
+    return (
+      <>
+        <RangeControl
+          label="Attack"
+          min={0.001}
+          max={1}
+          step={0.001}
+          value={route.attack}
+          onChange={(value) => onChange({ ...route, attack: value })}
+        />
+        <RangeControl
+          label="Decay"
+          min={0.001}
+          max={1}
+          step={0.001}
+          value={route.decay}
+          onChange={(value) => onChange({ ...route, decay: value })}
+        />
+        <RangeControl
+          label="Sustain"
+          min={0}
+          max={1}
+          step={0.001}
+          value={route.sustain}
+          onChange={(value) => onChange({ ...route, sustain: value })}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <RangeControl
+        label="Stiffness"
+        min={0.001}
+        max={1}
+        step={0.001}
+        value={route.attack}
+        onChange={(value) => onChange({ ...route, attack: value })}
+      />
+      <RangeControl
+        label="Damping"
+        min={0}
+        max={0.98}
+        step={0.001}
+        value={route.decay}
+        onChange={(value) => onChange({ ...route, decay: value })}
+      />
+    </>
+  );
+}
 
 export function RoutingMatrix({
   routes,
@@ -52,48 +184,42 @@ export function RoutingMatrix({
                   ))}
                 </select>
               </label>
+              <label>
+                <span>Tool</span>
+                <select
+                  value={route.processor}
+                  onChange={(event) =>
+                    onChange({ ...route, processor: event.target.value as RouteProcessor })
+                  }
+                >
+                  {PROCESSORS.map((processor) => (
+                    <option key={processor} value={processor}>{processor}</option>
+                  ))}
+                </select>
+              </label>
               <output>{(sourceValues[route.source] ?? 0).toFixed(3)}</output>
             </div>
 
             <div className="routeControls">
-              <label>
-                <span>Amount</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.01"
-                  value={route.amount}
-                  onChange={(event) => onChange({ ...route, amount: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                <span>Smooth</span>
-                <input
-                  type="range"
-                  min="0.01"
-                  max="1"
-                  step="0.01"
-                  value={route.smoothing}
-                  onChange={(event) => onChange({ ...route, smoothing: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                <span>Min</span>
-                <input
-                  type="number"
-                  value={route.min}
-                  onChange={(event) => onChange({ ...route, min: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                <span>Max</span>
-                <input
-                  type="number"
-                  value={route.max}
-                  onChange={(event) => onChange({ ...route, max: Number(event.target.value) })}
-                />
-              </label>
+              <RangeControl
+                label="Amount"
+                min={0}
+                max={2}
+                step={0.01}
+                value={route.amount}
+                onChange={(value) => onChange({ ...route, amount: value })}
+              />
+              <ProcessorControls route={route} onChange={onChange} />
+              <NumberControl
+                label="Min"
+                value={route.min}
+                onChange={(value) => onChange({ ...route, min: value })}
+              />
+              <NumberControl
+                label="Max"
+                value={route.max}
+                onChange={(value) => onChange({ ...route, max: value })}
+              />
               <button type="button" onClick={() => onChange({ ...route, enabled: !route.enabled })}>
                 {route.enabled ? 'on' : 'off'}
               </button>

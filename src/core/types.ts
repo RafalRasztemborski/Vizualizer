@@ -12,6 +12,7 @@ export type ReactiveSignals = {
   high: number;
   kickEnergy: number;
   lastKickTime: number;
+  nyquist: number;
   dataArray: number[];
 };
 
@@ -74,12 +75,18 @@ export type P5SketchModule = {
   dispose?: () => void;
 };
 
+export type RouteProcessor = 'raw' | 'lerp' | 'envelope' | 'spring';
+
 export type RouteMapping = {
   id: string;
   source: string;
   target: string;
+  processor: RouteProcessor;
   amount: number;
   smoothing: number;
+  attack: number;
+  decay: number;
+  sustain: number;
   min: number;
   max: number;
   enabled: boolean;

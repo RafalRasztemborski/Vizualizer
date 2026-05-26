@@ -15,7 +15,9 @@ const MIDI_SOURCE_KEYS = Array.from({ length: 128 }, (_, index) => `cc${index}`)
 
 function numericSignals(signals: ReactiveSignals): NumericRecord {
   return Object.fromEntries(
-    Object.entries(signals).filter(([, value]) => typeof value === 'number'),
+    Object.entries(signals).filter(
+      ([key, value]) => key !== 'nyquist' && typeof value === 'number',
+    ),
   ) as NumericRecord;
 }
 

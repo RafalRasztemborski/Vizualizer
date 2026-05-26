@@ -23,6 +23,7 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   high: 0,
   lastKickTime: 0,
   kickEnergy: 0,
+  nyquist: 22050,
   dataArray: [],
 };
 
@@ -50,7 +51,7 @@ export function processAudioBands(
   customConfig: Partial<typeof DEFAULT_AUDIO_BAND_CONFIG> = {},
 ): ReactiveSignals {
   const config = { ...DEFAULT_AUDIO_BAND_CONFIG, ...customConfig };
-  const normalizedDataArray = Array.from(dataArray, (value) => value / 255);
+  const normalizedDataArray = new Array<number>(dataArray.length).fill(0);
 
   let bassSum = 0;
   let bassCount = 0;
@@ -76,6 +77,7 @@ export function processAudioBands(
       rawValue > currentThreshold && denominator > 0
         ? Math.max(0, (rawValue - currentThreshold) / denominator)
         : 0;
+    normalizedDataArray[i] = v;
 
     if (freq >= 40 && freq < 90) {
       kickLow += v;
@@ -142,6 +144,7 @@ export function processAudioBands(
     high: prevHigh + (rawHigh - prevHigh) * config.highSmooth,
     lastKickTime: newLastKickTime,
     kickEnergy,
+    nyquist: maxFreq,
     dataArray: normalizedDataArray,
   };
 }

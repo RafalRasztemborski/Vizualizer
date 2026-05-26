@@ -70,16 +70,13 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-function spectrumValue(
-  dataArray: number[],
-  position: number,
-  rangeStart: number,
-  rangeEnd: number,
-) {
+function spectrumValueHz(dataArray: number[], nyquist: number, position: number, lowHz: number, highHz: number) {
   if (!dataArray.length) return 0;
 
-  const start = Math.floor(clamp01(rangeStart) * (dataArray.length - 1));
-  const end = Math.max(start, Math.floor(clamp01(rangeEnd) * (dataArray.length - 1)));
+  const lowIndex = Math.floor((Math.max(0, lowHz) / nyquist) * (dataArray.length - 1));
+  const highIndex = Math.ceil((Math.min(nyquist, highHz) / nyquist) * (dataArray.length - 1));
+  const start = Math.max(0, Math.min(dataArray.length - 1, lowIndex));
+  const end = Math.max(start, Math.min(dataArray.length - 1, highIndex));
   const index = Math.round(start + clamp01(position) * (end - start));
   const prev = dataArray[Math.max(start, index - 1)] ?? 0;
   const current = dataArray[index] ?? 0;
@@ -88,14 +85,16 @@ function spectrumValue(
   return (prev + current * 2 + next) / 4;
 }
 
-function radialPosition(a: number, aCount: number, b: number, bCount: number) {
-  const x = aCount <= 1 ? 0.5 : a / (aCount - 1);
-  const y = bCount <= 1 ? 0.5 : b / (bCount - 1);
-  const dx = x * 2 - 1;
-  const dy = y * 2 - 1;
-  const distanceFromCenter = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+function serpentinePosition(a: number, aCount: number, b: number, bCount: number) {
+  const safeA = Math.max(1, aCount - 2);
+  const safeB = Math.max(1, bCount - 2);
+  const innerA = Math.max(0, Math.min(safeA - 1, a - 1));
+  const innerB = Math.max(0, Math.min(safeB - 1, b - 1));
+  const rowA = innerB % 2 === 0 ? innerA : safeA - 1 - innerA;
+  const index = innerB * safeA + rowA;
+  const maxIndex = Math.max(1, safeA * safeB - 1);
 
-  return 1 - distanceFromCenter;
+  return index / maxIndex;
 }
 
 function drawBox(
@@ -504,6 +503,7 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const topBottomPulse = signals.mid;
   const frontBackPulse = signals.high;
   const spectrum = signals.dataArray;
+  const nyquist = signals.nyquist;
   const edgeWeight = Math.max(
     0,
     routedNumber(params, routedParams, 'edgeWeight', 1),
@@ -557,6 +557,7 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
     topBottomPulse,
     frontBackPulse,
     spectrum,
+    nyquist,
     timeMs,
   });
 
@@ -584,6 +585,7 @@ type DrawWallsArgs = {
   topBottomPulse: number;
   frontBackPulse: number;
   spectrum: number[];
+  nyquist: number;
   timeMs: number;
 };
 
@@ -611,6 +613,7 @@ function drawFrontBackWalls({
   audioDepth,
   frontBackPulse,
   spectrum,
+  nyquist,
   timeMs,
 }: DrawWallsArgs) {
   for (let x = 1; x < xRows - 1; x += 1) {
@@ -618,13 +621,14 @@ function drawFrontBackWalls({
 
     for (let y = 1; y < yRows - 1; y += 1) {
       const falloff = falloffX * sineFalloff(y, yRows);
-      const spectralEnergy = spectrumValue(
+      const spectralEnergy = spectrumValueHz(
         spectrum,
-        radialPosition(x, xRows, y, yRows),
-        0.55,
-        0.98,
+        nyquist,
+        serpentinePosition(x, xRows, y, yRows),
+        2500,
+        12000,
       );
-      const energy = spectralEnergy * 0.9 + frontBackPulse * 0.2;
+      const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
@@ -690,6 +694,7 @@ function drawLeftRightWalls({
   audioDepth,
   sidePulse,
   spectrum,
+  nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
@@ -700,13 +705,14 @@ function drawLeftRightWalls({
 
     for (let z = 1; z < zRows - 1; z += 1) {
       const falloff = falloffY * sineFalloff(z, zRows);
-      const spectralEnergy = spectrumValue(
+      const spectralEnergy = spectrumValueHz(
         spectrum,
-        radialPosition(y, yRows, z, zRows),
-        0.01,
-        0.18,
+        nyquist,
+        serpentinePosition(z, zRows, y, yRows),
+        35,
+        260,
       );
-      const energy = spectralEnergy * 0.9 + sidePulse * 0.2;
+      const energy = spectralEnergy * 1.25 + sidePulse * 0.15;
       const anim = falloff * energy * audioDepth;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
@@ -766,6 +772,7 @@ function drawTopBottomWalls({
   audioDepth,
   topBottomPulse,
   spectrum,
+  nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
@@ -776,13 +783,14 @@ function drawTopBottomWalls({
 
     for (let z = 1; z < zRows - 1; z += 1) {
       const falloff = falloffX * sineFalloff(z, zRows);
-      const spectralEnergy = spectrumValue(
+      const spectralEnergy = spectrumValueHz(
         spectrum,
-        radialPosition(x, xRows, z, zRows),
-        0.18,
-        0.55,
+        nyquist,
+        serpentinePosition(x, xRows, z, zRows),
+        260,
+        2500,
       );
-      const energy = spectralEnergy * 0.9 + topBottomPulse * 0.2;
+      const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
