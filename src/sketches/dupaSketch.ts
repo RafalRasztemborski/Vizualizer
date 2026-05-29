@@ -459,6 +459,48 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 230,
     },
+    {
+      key: 'frontFormula',
+      label: 'Front formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'backFormula',
+      label: 'Back formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'leftFormula',
+      label: 'Left formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'rightFormula',
+      label: 'Right formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'topFormula',
+      label: 'Top formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'bottomFormula',
+      label: 'Bottom formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
   ],
   setup(p) {
     p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
@@ -647,14 +689,20 @@ function drawFrontBackWalls({
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
+      const frontMethod = params.frontFormula ?? 'new';
+      const backMethod = params.backFormula ?? 'new';
 
       if (wallEnabled(params, 'front')) {
+        const pz =
+          frontMethod === 'old'
+            ? -totalDepth / 2 + stepZ / 2 - anim / 2
+            : -totalDepth / 2 + stepZ - anim * 2 - (stepZ - stepZ / 2);
+
         drawBox(
           p,
           px,
           py,
-          //-totalDepth / 2 + stepZ / 2 - anim / 2,
-          -totalDepth / 2 + stepZ - anim * 2,
+          pz,
           xSize,
           ySize,
           zSize + anim,
@@ -663,13 +711,16 @@ function drawFrontBackWalls({
       }
 
       if (wallEnabled(params, 'back')) {
+        const pz =
+          backMethod === 'old'
+            ? totalDepth / 2 - stepZ / 2 + anim / 2
+            : totalDepth / 2 - stepZ + anim * 2 + (stepZ - stepZ / 2);
+
         drawBox(
           p,
           px,
           py,
-          // -totalWidth / 2 - anim + stepX * 2,
-          //totalDepth / 2 - stepZ / 2 + anim / 2,
-          totalDepth / 2 - stepZ + anim * 2,
+          pz,
           xSize,
           ySize,
           zSize + anim,
@@ -721,12 +772,18 @@ function drawLeftRightWalls({
       const py = totalHeight / 2 - y * stepY - stepY / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
+      const leftMethod = params.leftFormula ?? 'new';
+      const rightMethod = params.rightFormula ?? 'new';
 
       if (wallEnabled(params, 'left')) {
+        const px =
+          leftMethod === 'old'
+            ? -totalWidth / 2 + stepX / 2 - anim / 2
+            : -totalWidth / 2 - anim + stepX * 2 - (stepX + stepX / 2);
+
         drawBox(
           p,
-          // -totalWidth / 2 + stepX / 2 - anim / 2, (old way)
-          -totalWidth / 2 - anim + stepX * 2,
+          px,
           py,
           warpedZ,
           xSize + anim,
@@ -737,10 +794,14 @@ function drawLeftRightWalls({
       }
 
       if (wallEnabled(params, 'right')) {
+        const px =
+          rightMethod === 'old'
+            ? totalWidth / 2 - stepX / 2 + anim / 2
+            : totalWidth / 2 + anim - stepX * 2 + (stepX + stepX / 2);
+
         drawBox(
           p,
-          // totalWidth / 2 - stepX / 2 + anim / 2(old wAY),
-          totalWidth / 2 + anim - stepX * 2,
+          px,
           py,
           warpedZ,
           xSize + anim,
@@ -794,13 +855,19 @@ function drawTopBottomWalls({
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
+      const topMethod = params.topFormula ?? 'new';
+      const bottomMethod = params.bottomFormula ?? 'new';
 
       if (wallEnabled(params, 'top')) {
+        const py =
+          topMethod === 'old'
+            ? totalHeight / 2 - stepY / 2 + anim / 2
+            : totalHeight / 2 - stepY * 2 + anim + (stepY + stepY / 2);
+
         drawBox(
           p,
           px,
-          //totalHeight / 2 - stepY / 2 + anim / 2,
-          totalHeight / 2 - stepY * 2 + anim,
+          py,
           warpedZ,
           xSize,
           ySize + anim,
@@ -810,11 +877,15 @@ function drawTopBottomWalls({
       }
 
       if (wallEnabled(params, 'bottom')) {
+        const py =
+          bottomMethod === 'old'
+            ? -totalHeight / 2 + stepY / 2 - anim / 2
+            : -totalHeight / 2 + stepY * 2 - anim - (stepY + stepY / 2);
+
         drawBox(
           p,
           px,
-          // -totalHeight / 2 + stepY / 2 - anim / 2,
-          -totalHeight / 2 + stepY * 2 - anim,
+          py,
           warpedZ,
           xSize,
           ySize + anim,

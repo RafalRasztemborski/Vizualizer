@@ -110,11 +110,5 @@ export function applyRouting(
     routed[route.target] = (routed[route.target] ?? 0) + safeNext;
   }
 
-  for (const [key, value] of Object.entries(previous)) {
-    if (key.startsWith('__route:')) {
-      routed[key] = value;
-    }
-  }
-
   return routed;
 }
