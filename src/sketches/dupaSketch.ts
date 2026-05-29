@@ -70,11 +70,21 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-function spectrumValueHz(dataArray: number[], nyquist: number, position: number, lowHz: number, highHz: number) {
+function spectrumValueHz(
+  dataArray: number[],
+  nyquist: number,
+  position: number,
+  lowHz: number,
+  highHz: number,
+) {
   if (!dataArray.length) return 0;
 
-  const lowIndex = Math.floor((Math.max(0, lowHz) / nyquist) * (dataArray.length - 1));
-  const highIndex = Math.ceil((Math.min(nyquist, highHz) / nyquist) * (dataArray.length - 1));
+  const lowIndex = Math.floor(
+    (Math.max(0, lowHz) / nyquist) * (dataArray.length - 1),
+  );
+  const highIndex = Math.ceil(
+    (Math.min(nyquist, highHz) / nyquist) * (dataArray.length - 1),
+  );
   const start = Math.max(0, Math.min(dataArray.length - 1, lowIndex));
   const end = Math.max(start, Math.min(dataArray.length - 1, highIndex));
   const index = Math.round(start + clamp01(position) * (end - start));
@@ -85,7 +95,12 @@ function spectrumValueHz(dataArray: number[], nyquist: number, position: number,
   return (prev + current * 2 + next) / 4;
 }
 
-function serpentinePosition(a: number, aCount: number, b: number, bCount: number) {
+function serpentinePosition(
+  a: number,
+  aCount: number,
+  b: number,
+  bCount: number,
+) {
   const safeA = Math.max(1, aCount - 2);
   const safeB = Math.max(1, bCount - 2);
   const innerA = Math.max(0, Math.min(safeA - 1, a - 1));
@@ -638,18 +653,12 @@ function drawFrontBackWalls({
           p,
           px,
           py,
-          -totalDepth / 2 + stepZ / 2 - anim / 2,
+          //-totalDepth / 2 + stepZ / 2 - anim / 2,
+          -totalDepth / 2 + stepZ - anim * 2,
           xSize,
           ySize,
           zSize + anim,
-          colorForBox(
-            params,
-            routedParams,
-            'front',
-            falloff,
-            energy,
-            timeMs,
-          ),
+          colorForBox(params, routedParams, 'front', falloff, energy, timeMs),
         );
       }
 
@@ -658,18 +667,13 @@ function drawFrontBackWalls({
           p,
           px,
           py,
-          totalDepth / 2 - stepZ / 2 + anim / 2,
+          // -totalWidth / 2 - anim + stepX * 2,
+          //totalDepth / 2 - stepZ / 2 + anim / 2,
+          totalDepth / 2 - stepZ + anim * 2,
           xSize,
           ySize,
           zSize + anim,
-          colorForBox(
-            params,
-            routedParams,
-            'back',
-            falloff,
-            energy,
-            timeMs,
-          ),
+          colorForBox(params, routedParams, 'back', falloff, energy, timeMs),
         );
       }
     }
@@ -721,7 +725,8 @@ function drawLeftRightWalls({
       if (wallEnabled(params, 'left')) {
         drawBox(
           p,
-          -totalWidth / 2 + stepX / 2 - anim / 2,
+          // -totalWidth / 2 + stepX / 2 - anim / 2, (old way)
+          -totalWidth / 2 - anim + stepX * 2,
           py,
           warpedZ,
           xSize + anim,
@@ -734,20 +739,14 @@ function drawLeftRightWalls({
       if (wallEnabled(params, 'right')) {
         drawBox(
           p,
-          totalWidth / 2 - stepX / 2 + anim / 2,
+          // totalWidth / 2 - stepX / 2 + anim / 2(old wAY),
+          totalWidth / 2 + anim - stepX * 2,
           py,
           warpedZ,
           xSize + anim,
           ySize,
           zSize,
-          colorForBox(
-            params,
-            routedParams,
-            'right',
-            falloff,
-            energy,
-            timeMs,
-          ),
+          colorForBox(params, routedParams, 'right', falloff, energy, timeMs),
         );
       }
     }
@@ -800,19 +799,13 @@ function drawTopBottomWalls({
         drawBox(
           p,
           px,
-          totalHeight / 2 - stepY / 2 + anim / 2,
+          //totalHeight / 2 - stepY / 2 + anim / 2,
+          totalHeight / 2 - stepY * 2 + anim,
           warpedZ,
           xSize,
           ySize + anim,
           zSize,
-          colorForBox(
-            params,
-            routedParams,
-            'top',
-            falloff,
-            energy,
-            timeMs,
-          ),
+          colorForBox(params, routedParams, 'top', falloff, energy, timeMs),
         );
       }
 
@@ -820,19 +813,13 @@ function drawTopBottomWalls({
         drawBox(
           p,
           px,
-          -totalHeight / 2 + stepY / 2 - anim / 2,
+          // -totalHeight / 2 + stepY / 2 - anim / 2,
+          -totalHeight / 2 + stepY * 2 - anim,
           warpedZ,
           xSize,
           ySize + anim,
           zSize,
-          colorForBox(
-            params,
-            routedParams,
-            'bottom',
-            falloff,
-            energy,
-            timeMs,
-          ),
+          colorForBox(params, routedParams, 'bottom', falloff, energy, timeMs),
         );
       }
     }

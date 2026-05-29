@@ -135,7 +135,7 @@ export function processAudioBands(
   }
 
   return {
-    detectedKick,
+    z,
     kick: kickDelta,
     bassWithoutKick: Math.max(0, rawBass - kickDelta * 1.5),
     cleanedBass: Math.max(0, rawBass - rawKick),
