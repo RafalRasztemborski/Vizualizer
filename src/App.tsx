@@ -130,10 +130,15 @@ export function App() {
   const [routes, setRoutes] = useState<RouteMapping[]>(() =>
     defaultRoutesForSketch(selectedSketchId),
   );
+  const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
   const midiRef = useRef(new MidiManager());
   const routedRef = useRef<NumericRecord>({});
+  const fpsRef = useRef({
+    frames: 0,
+    lastSample: performance.now(),
+  });
   const runtimeRef = useRef<P5RuntimeState>({
     params: initialParams,
     routedParams: {},
@@ -183,6 +188,18 @@ export function App() {
       };
 
       const now = performance.now();
+      fpsRef.current.frames += 1;
+      if (now - fpsRef.current.lastSample >= 500) {
+        setFps(
+          (fpsRef.current.frames * 1000) /
+            (now - fpsRef.current.lastSample),
+        );
+        fpsRef.current = {
+          frames: 0,
+          lastSample: now,
+        };
+      }
+
       if (now - lastUiUpdate > 50) {
         setSignals(nextSignals);
         setMidi(nextMidi);
@@ -228,6 +245,16 @@ export function App() {
         runtimeRef={runtimeRef}
       />
 
+      <AnalyzerPanel
+        config={audioRef.current.config}
+        signals={signals}
+        fps={fps}
+        onConfigChange={(key, value) => {
+          audioRef.current.setConfigValue(key, value);
+          setAudioVersion((version) => version + 1);
+        }}
+      />
+
       <aside className="sidebar">
         <section className="panel">
           <h1>p5 Reactive Runtime</h1>
@@ -261,16 +288,6 @@ export function App() {
             void audioRef.current
               .useFile(file)
               .then(() => setAudioVersion((version) => version + 1));
-          }}
-        />
-
-        <AnalyzerPanel
-          key={audioVersion}
-          config={audioRef.current.config}
-          signals={signals}
-          onConfigChange={(key, value) => {
-            audioRef.current.setConfigValue(key, value);
-            setAudioVersion((version) => version + 1);
           }}
         />
 

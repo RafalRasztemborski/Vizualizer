@@ -16,6 +16,10 @@ type BoxColor = {
   edgeAlpha: number;
 };
 
+type DupaState = {
+  trailShader?: p5.Shader;
+};
+
 const WALL_PARAM: Record<WallName, string> = {
   front: 'showFrontWall',
   back: 'showBackWall',
@@ -24,6 +28,39 @@ const WALL_PARAM: Record<WallName, string> = {
   top: 'showTopWall',
   bottom: 'showBottomWall',
 };
+
+const TRAIL_VERTEX_SHADER = `
+precision mediump float;
+
+attribute vec3 aPosition;
+
+void main() {
+  gl_Position = vec4(aPosition.xy, 0.0, 1.0);
+}
+`;
+
+const TRAIL_FRAGMENT_SHADER = `
+precision mediump float;
+
+uniform float uAlpha;
+uniform float uScanlineAmount;
+uniform float uScanlineCount;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform vec3 uTopColor;
+uniform vec3 uBottomColor;
+
+void main() {
+  float y = clamp(gl_FragCoord.y / max(uResolution.y, 1.0), 0.0, 1.0);
+  vec3 color = mix(uBottomColor, uTopColor, y);
+  float scan = sin((gl_FragCoord.y + uTime * 24.0) * uScanlineCount);
+  float scanMask = mix(1.0, 0.58 + 0.42 * smoothstep(-0.2, 0.75, scan), uScanlineAmount);
+  color *= scanMask;
+  gl_FragColor = vec4(color, uAlpha);
+}
+`;
+
+const state: DupaState = {};
 
 function numberParam(params: SketchParams, key: string, fallback = 0) {
   const value = params[key];
@@ -48,15 +85,45 @@ function wallEnabled(params: SketchParams, wall: WallName) {
   return boolParam(params, WALL_PARAM[wall], true);
 }
 
-function clearWebglTrail(p: p5, alpha: number) {
+function clearWebglTrail(
+  p: p5,
+  alpha: number,
+  mode: SketchParams[string],
+  scanlineAmount: number,
+  scanlineCount: number,
+  timeMs: number,
+) {
   const gl = p.drawingContext as WebGLRenderingContext;
 
   p.push();
   p.resetMatrix();
   gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   p.noStroke();
-  p.fill(0, 0, 0, alpha);
-  p.rect(-p.width / 2, -p.height / 2, p.width, p.height);
+
+  if (mode === 'gradient' && state.trailShader) {
+    p.shader(state.trailShader);
+    state.trailShader.setUniform('uAlpha', clamp01(alpha / 255));
+    state.trailShader.setUniform('uScanlineAmount', scanlineAmount);
+    state.trailShader.setUniform('uScanlineCount', scanlineCount);
+    state.trailShader.setUniform('uTime', timeMs * 0.001);
+    state.trailShader.setUniform('uResolution', [p.width, p.height]);
+    state.trailShader.setUniform('uTopColor', [5 / 255, 10 / 255, 30 / 255]);
+    state.trailShader.setUniform('uBottomColor', [0, 0, 0]);
+
+    p.beginShape();
+    p.vertex(-1, -1, 0);
+    p.vertex(1, -1, 0);
+    p.vertex(1, 1, 0);
+    p.vertex(-1, 1, 0);
+    p.endShape(p.CLOSE);
+    p.resetShader();
+  } else {
+    p.fill(0, 0, 0, alpha);
+    p.rect(-p.width / 2, -p.height / 2, p.width, p.height);
+  }
+
   gl.enable(gl.DEPTH_TEST);
   p.pop();
 }
@@ -414,6 +481,31 @@ export const dupaSketch: P5SketchModule = {
       defaultValue: 255,
     },
     {
+      key: 'trailMode',
+      label: 'Trail mode',
+      type: 'select',
+      options: ['solid', 'gradient'],
+      defaultValue: 'solid',
+    },
+    {
+      key: 'scanlineAmount',
+      label: 'Scanline amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.35,
+    },
+    {
+      key: 'scanlineCount',
+      label: 'Scanline count',
+      type: 'number',
+      min: 0.05,
+      max: 1.5,
+      step: 0.01,
+      defaultValue: 0.48,
+    },
+    {
       key: 'dynamicLight',
       label: 'Dynamic light',
       type: 'boolean',
@@ -552,6 +644,10 @@ export const dupaSketch: P5SketchModule = {
   setup(p) {
     p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
     p.colorMode(p.HSB, 360, 100, 100, 255);
+    state.trailShader = p.createShader(
+      TRAIL_VERTEX_SHADER,
+      TRAIL_FRAGMENT_SHADER,
+    );
   },
   draw(frame) {
     drawDupa(frame);
@@ -568,6 +664,10 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
       0,
       Math.min(255, routedNumber(params, routedParams, 'trailAlpha', 80)),
     ),
+    params.trailMode ?? 'solid',
+    clamp01(routedNumber(params, routedParams, 'scanlineAmount', 0.35)),
+    Math.max(0.01, routedNumber(params, routedParams, 'scanlineCount', 0.48)),
+    timeMs,
   );
 
   const xSize = Math.max(1, routedNumber(params, routedParams, 'X_SIZE', 20));
