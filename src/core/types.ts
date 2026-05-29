@@ -90,4 +90,9 @@ export type RouteMapping = {
   min: number;
   max: number;
   enabled: boolean;
+
+  // Opcjonalne parametry bramki
+  gatewayMode?: 'none' | 'active';
+  gatewayThreshold?: number; // Próg powyżej którego sygnał "otwiera" bramkę
+  gatewayDecay?: number; // Szybkość
 };

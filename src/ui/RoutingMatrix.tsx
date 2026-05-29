@@ -1,6 +1,11 @@
-import type { NumericRecord, RouteMapping, RouteProcessor } from '../core/types';
+import type {
+  NumericRecord,
+  RouteMapping,
+  RouteProcessor,
+} from '../core/types';
 
 const PROCESSORS: RouteProcessor[] = ['raw', 'lerp', 'envelope', 'spring'];
+const GATEWAY_MODES = ['none', 'active'] as const;
 
 type RouteControlProps = {
   route: RouteMapping;
@@ -155,7 +160,9 @@ export function RoutingMatrix({
     <section className="panel">
       <div className="panelHeader">
         <h2>Routing</h2>
-        <button type="button" onClick={onAdd}>+</button>
+        <button type="button" onClick={onAdd}>
+          +
+        </button>
       </div>
 
       <div className="routes">
@@ -166,10 +173,14 @@ export function RoutingMatrix({
                 <span>Source</span>
                 <select
                   value={route.source}
-                  onChange={(event) => onChange({ ...route, source: event.target.value })}
+                  onChange={(event) =>
+                    onChange({ ...route, source: event.target.value })
+                  }
                 >
                   {sourceKeys.map((key) => (
-                    <option key={key} value={key}>{key}</option>
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -177,10 +188,14 @@ export function RoutingMatrix({
                 <span>Target</span>
                 <select
                   value={route.target}
-                  onChange={(event) => onChange({ ...route, target: event.target.value })}
+                  onChange={(event) =>
+                    onChange({ ...route, target: event.target.value })
+                  }
                 >
                   {targetKeys.map((key) => (
-                    <option key={key} value={key}>{key}</option>
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -189,11 +204,34 @@ export function RoutingMatrix({
                 <select
                   value={route.processor}
                   onChange={(event) =>
-                    onChange({ ...route, processor: event.target.value as RouteProcessor })
+                    onChange({
+                      ...route,
+                      processor: event.target.value as RouteProcessor,
+                    })
                   }
                 >
                   {PROCESSORS.map((processor) => (
-                    <option key={processor} value={processor}>{processor}</option>
+                    <option key={processor} value={processor}>
+                      {processor}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Gate</span>
+                <select
+                  value={route.gatewayMode ?? 'none'}
+                  onChange={(event) =>
+                    onChange({
+                      ...route,
+                      gatewayMode: event.target.value as 'none' | 'active',
+                    })
+                  }
+                >
+                  {GATEWAY_MODES.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -210,6 +248,30 @@ export function RoutingMatrix({
                 onChange={(value) => onChange({ ...route, amount: value })}
               />
               <ProcessorControls route={route} onChange={onChange} />
+              {route.gatewayMode === 'active' && (
+                <>
+                  <RangeControl
+                    label="Gate Thr"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={route.gatewayThreshold ?? 0}
+                    onChange={(value) =>
+                      onChange({ ...route, gatewayThreshold: value })
+                    }
+                  />
+                  <RangeControl
+                    label="Gate Decay"
+                    min={0.001}
+                    max={0.5}
+                    step={0.001}
+                    value={route.gatewayDecay ?? 0.05}
+                    onChange={(value) =>
+                      onChange({ ...route, gatewayDecay: value })
+                    }
+                  />
+                </>
+              )}
               <NumberControl
                 label="Min"
                 value={route.min}
@@ -220,10 +282,15 @@ export function RoutingMatrix({
                 value={route.max}
                 onChange={(value) => onChange({ ...route, max: value })}
               />
-              <button type="button" onClick={() => onChange({ ...route, enabled: !route.enabled })}>
+              <button
+                type="button"
+                onClick={() => onChange({ ...route, enabled: !route.enabled })}
+              >
                 {route.enabled ? 'on' : 'off'}
               </button>
-              <button type="button" onClick={() => onRemove(route.id)}>x</button>
+              <button type="button" onClick={() => onRemove(route.id)}>
+                x
+              </button>
             </div>
           </div>
         ))}

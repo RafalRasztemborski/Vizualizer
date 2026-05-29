@@ -1,6 +1,7 @@
 import type { NumericRecord, RouteMapping, SketchParams } from '../core/types';
 
-const stateKey = (route: RouteMapping, key: string) => `__route:${route.id}:${key}`;
+const stateKey = (route: RouteMapping, key: string) =>
+  `__route:${route.id}:${key}`;
 
 export function createRoute(source: string, target: string): RouteMapping {
   return {
@@ -16,10 +17,18 @@ export function createRoute(source: string, target: string): RouteMapping {
     min: 0,
     max: 100,
     enabled: true,
+    gatewayMode: 'none',
+    gatewayThreshold: 0,
+    gatewayDecay: 0.05,
   };
 }
 
-function processRoute(route: RouteMapping, sourceValue: number, mappedValue: number, previous: NumericRecord) {
+function processRoute(
+  route: RouteMapping,
+  sourceValue: number,
+  mappedValue: number,
+  previous: NumericRecord,
+) {
   const valueKey = stateKey(route, 'value');
   const velocityKey = stateKey(route, 'velocity');
   const sourceKey = stateKey(route, 'source');
@@ -37,9 +46,12 @@ function processRoute(route: RouteMapping, sourceValue: number, mappedValue: num
     const sustain = Math.max(0, Math.min(1, route.sustain));
     const isRising = sourceValue > prevSource || sourceValue > envelope;
     const targetEnvelope = isRising ? sourceValue : sourceValue * sustain;
-    const nextEnvelope = envelope + (targetEnvelope - envelope) * (isRising ? attack : decay);
+    const nextEnvelope =
+      envelope + (targetEnvelope - envelope) * (isRising ? attack : decay);
 
-    previous[stateKey(route, 'envelope')] = Number.isFinite(nextEnvelope) ? nextEnvelope : envelope;
+    previous[stateKey(route, 'envelope')] = Number.isFinite(nextEnvelope)
+      ? nextEnvelope
+      : envelope;
     previous[sourceKey] = sourceValue;
     return route.min + nextEnvelope * route.amount * (route.max - route.min);
   }
@@ -48,7 +60,8 @@ function processRoute(route: RouteMapping, sourceValue: number, mappedValue: num
     const stiffness = Math.max(0.001, route.attack);
     const damping = 1 - Math.max(0, Math.min(0.98, route.decay));
     const velocity = previous[velocityKey] ?? 0;
-    const nextVelocity = (velocity + (mappedValue - prev) * stiffness) * damping;
+    const nextVelocity =
+      (velocity + (mappedValue - prev) * stiffness) * damping;
     previous[velocityKey] = Number.isFinite(nextVelocity) ? nextVelocity : 0;
     return prev + nextVelocity;
   }
@@ -68,8 +81,29 @@ export function applyRouting(
     if (!route.enabled) continue;
 
     const sourceValue = sources[route.source] ?? 0;
-    const mappedValue = route.min + sourceValue * route.amount * (route.max - route.min);
-    const next = processRoute(route, sourceValue, mappedValue, previous);
+    let gatedSourceValue = sourceValue;
+
+    // Wykonaj logikę bramki tylko jeśli jest aktywna
+    if (route.gatewayMode === 'active') {
+      const threshold = route.gatewayThreshold ?? 0;
+      const decay = route.gatewayDecay ?? 1;
+      const gateKey = stateKey(route, 'gateState');
+      let gateState = previous[gateKey] ?? 0;
+
+      if (sourceValue > threshold) {
+        gateState = 1.0;
+      } else {
+        gateState = Math.max(0, gateState - decay);
+      }
+      previous[gateKey] = gateState;
+
+      // Sygnał jest przepuszczany tylko jeśli bramka jest otwarta (gateState > 0)
+      gatedSourceValue = sourceValue * (gateState > 0 ? 1 : 0);
+    }
+
+    const mappedValue =
+      route.min + gatedSourceValue * route.amount * (route.max - route.min);
+    const next = processRoute(route, gatedSourceValue, mappedValue, previous);
     const safeNext = Number.isFinite(next) ? next : 0;
 
     previous[stateKey(route, 'value')] = safeNext;
