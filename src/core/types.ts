@@ -13,6 +13,7 @@ export type ReactiveSignals = {
   kickEnergy: number;
   lastKickTime: number;
   nyquist: number;
+  fps: number;
   dataArray: number[];
 };
 
@@ -90,6 +91,15 @@ export type RouteMapping = {
   min: number;
   max: number;
   enabled: boolean;
+
+  // Opcjonalne wygładzanie (Smoothing)
+  smoothingActive?: boolean;
+  smoothWeightPrev?: number; // Płynność (waga poprzedniej wartości)
+  smoothWeightNew?: number; // Responsywność (waga nowej wartości)
+
+  // Nowy etap: Post-Lerp
+  lerpActive?: boolean;
+  lerpAmount?: number;
 
   // Opcjonalne parametry bramki
   gatewayMode?: 'none' | 'active';

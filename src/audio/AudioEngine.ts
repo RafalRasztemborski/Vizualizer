@@ -80,13 +80,19 @@ export class AudioEngine {
     this.sourceKind = 'file';
   }
 
-  update(): ReactiveSignals {
+  update(fps: number = 0): ReactiveSignals {
     if (!this.context || !this.analyser) {
       return this.signals;
     }
 
     this.analyser.getByteFrequencyData(this.bins);
-    this.signals = processAudioBands(this.bins, this.context.sampleRate, this.signals, this.config);
+    this.signals = processAudioBands(
+      this.bins,
+      this.context.sampleRate,
+      this.signals,
+      this.config,
+      fps,
+    );
     return this.signals;
   }
 

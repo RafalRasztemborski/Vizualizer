@@ -295,6 +295,53 @@ export const dupaSketch: P5SketchModule = {
   name: 'Dupa',
   description: 'Reaktywny tunel z szesciennych scian w WEBGL.',
   params: [
+    // --- SEKCJA 1: POZYCJA I ORIENTACJA ---
+    {
+      key: 'z_position',
+      label: 'Tunnel Z Pos',
+      type: 'number',
+      min: -2000,
+      max: 800,
+      step: 1,
+      defaultValue: 0,
+    },
+    {
+      key: 'Crazy_z_position',
+      label: 'Z Warp (Crazy)',
+      type: 'number',
+      min: -50,
+      max: 50,
+      step: 1,
+      defaultValue: 0,
+    },
+    {
+      key: 'rotationSpeed',
+      label: 'Auto-Rot Speed',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'autoRotateX',
+      label: 'Auto Rotate X',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'autoRotateY',
+      label: 'Auto Rotate Y',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'autoRotateZ',
+      label: 'Auto Rotate Z',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    // --- SEKCJA 2: GEOMETRIA SIATKI (GRID) ---
     {
       key: 'X_SIZE',
       label: 'X size',
@@ -406,7 +453,7 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 0,
     },
-
+    // --- SEKCJA 3: WIDOCZNOŚĆ ŚCIAN ---
     {
       key: 'showFrontWall',
       label: 'Front wall',
@@ -443,28 +490,10 @@ export const dupaSketch: P5SketchModule = {
       type: 'boolean',
       defaultValue: true,
     },
-
-    {
-      key: 'z_position',
-      label: 'Z position',
-      type: 'number',
-      min: -2000,
-      max: 800,
-      step: 1,
-      defaultValue: 0,
-    },
-    {
-      key: 'Crazy_z_position',
-      label: 'Crazy Z',
-      type: 'number',
-      min: -50,
-      max: 50,
-      step: 1,
-      defaultValue: 0,
-    },
+    // --- SEKCJA 4: REAKTYWNOŚĆ AUDIO ---
     {
       key: 'audioDepth',
-      label: 'Audio depth',
+      label: 'Audio intensity',
       type: 'number',
       min: 0,
       max: 500,
@@ -473,7 +502,7 @@ export const dupaSketch: P5SketchModule = {
     },
     {
       key: 'sidePulseMult',
-      label: 'Side pulse mult',
+      label: 'Pulse Mult: Sides',
       type: 'number',
       min: 0,
       max: 5,
@@ -482,7 +511,7 @@ export const dupaSketch: P5SketchModule = {
     },
     {
       key: 'topBottomPulseMult',
-      label: 'T/B pulse mult',
+      label: 'Pulse Mult: T/B',
       type: 'number',
       min: 0,
       max: 5,
@@ -491,13 +520,14 @@ export const dupaSketch: P5SketchModule = {
     },
     {
       key: 'frontBackPulseMult',
-      label: 'F/B pulse mult',
+      label: 'Pulse Mult: F/B',
       type: 'number',
       min: 0,
       max: 5,
       step: 0.1,
       defaultValue: 1,
     },
+    // --- SEKCJA 5: KOLORY I ŚWIATŁO ---
     {
       key: 'trailAlpha',
       label: 'Trail alpha',
@@ -583,6 +613,7 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 255,
     },
+    // --- SEKCJA 6: KRAWĘDZIE I WYRÓWNANIE ---
     {
       key: 'edgeWeight',
       label: 'Edge weight',
@@ -687,6 +718,7 @@ export const dupaSketch: P5SketchModule = {
       options: ['old', 'new'],
       defaultValue: 'new',
     },
+    // --- SEKCJA 7: FORMUŁY MATEMATYCZNE ---
     {
       key: 'leftFormula',
       label: 'Left formula',
@@ -778,6 +810,18 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const totalHeight = yRows * stepY;
   const totalDepth = zRows * stepZ;
   const t = timeMs * 0.001;
+
+  const rotationSpeed = routedNumber(params, routedParams, 'rotationSpeed', 1);
+  const autoRotX = boolParam(params, 'autoRotateX', false)
+    ? t * rotationSpeed
+    : 0;
+  const autoRotY = boolParam(params, 'autoRotateY', false)
+    ? t * rotationSpeed
+    : 0;
+  const autoRotZ = boolParam(params, 'autoRotateZ', false)
+    ? t * rotationSpeed
+    : 0;
+
   const sidePulse =
     (signals.bass * 0.75 + signals.kickEnergy * 1.8) *
     routedNumber(params, routedParams, 'sidePulseMult', 1);
@@ -796,13 +840,18 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   p.translate(0, 0, routedNumber(params, routedParams, 'z_position', 0));
   p.rotateX(
     p.radians(routedNumber(params, routedParams, 'X_ROTATE', 0)) +
+      autoRotX +
       Math.sin(t * 0.4) * signals.high * 0.25,
   );
   p.rotateY(
     p.radians(routedNumber(params, routedParams, 'Y_ROTATE', 0)) +
+      autoRotY +
       Math.sin(t * 0.35) * signals.bass * 0.25,
   );
   p.rotateZ(p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)));
+  p.rotateZ(
+    p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)) + autoRotZ,
+  );
 
   p.ambientLight(0, 0, 24 + signals.mid * 18);
   p.directionalLight(0, 0, 96, -0.35, 0.45, -1);

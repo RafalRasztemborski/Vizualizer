@@ -195,8 +195,7 @@ export function App() {
       fpsRef.current.frames += 1;
       if (now - fpsRef.current.lastSample >= 500) {
         setFps(
-          (fpsRef.current.frames * 1000) /
-            (now - fpsRef.current.lastSample),
+          (fpsRef.current.frames * 1000) / (now - fpsRef.current.lastSample),
         );
         fpsRef.current = {
           frames: 0,
@@ -328,6 +327,7 @@ export function App() {
 
         <RoutingMatrix
           routes={routes}
+          routeStates={routedParams}
           sourceKeys={sourceKeys}
           sourceValues={routeSourceValues}
           targetKeys={targetKeys}

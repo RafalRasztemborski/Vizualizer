@@ -1,7 +1,7 @@
 import type { NumericRecord, RouteMapping, SketchParams } from '../core/types';
 
-const stateKey = (route: RouteMapping, key: string) =>
-  `__route:${route.id}:${key}`;
+export const getRouteStateKey = (routeId: string, key: string) =>
+  `__route:${routeId}:${key}`;
 
 export function createRoute(source: string, target: string): RouteMapping {
   return {
@@ -20,6 +20,11 @@ export function createRoute(source: string, target: string): RouteMapping {
     gatewayMode: 'none',
     gatewayThreshold: 0,
     gatewayDecay: 0.05,
+    smoothingActive: false,
+    smoothWeightPrev: 0.8,
+    smoothWeightNew: 0.2,
+    lerpActive: false,
+    lerpAmount: 0.1,
   };
 }
 
@@ -29,10 +34,14 @@ function processRoute(
   mappedValue: number,
   previous: NumericRecord,
 ) {
-  const valueKey = stateKey(route, 'value');
-  const velocityKey = stateKey(route, 'velocity');
-  const sourceKey = stateKey(route, 'source');
-  const prev = previous[valueKey] ?? 0;
+  const valueKey = getRouteStateKey(route.id, 'value');
+  const velocityKey = getRouteStateKey(route.id, 'velocity');
+  const sourceKey = getRouteStateKey(route.id, 'source');
+
+  // Sprawdź czy mamy poprzednią wartość w stanie
+  const hasPrev = typeof previous[valueKey] === 'number';
+  // Jeśli nie ma poprzedniej wartości, zacznij od aktualnej docelowej
+  const prev = hasPrev ? (previous[valueKey] as number) : mappedValue;
 
   if (route.processor === 'raw') {
     return mappedValue;
@@ -40,7 +49,7 @@ function processRoute(
 
   if (route.processor === 'envelope') {
     const prevSource = previous[sourceKey] ?? 0;
-    const envelope = previous[stateKey(route, 'envelope')] ?? 0;
+    const envelope = previous[getRouteStateKey(route.id, 'envelope')] ?? 0;
     const attack = Math.max(0.001, route.attack);
     const decay = Math.max(0.001, route.decay);
     const sustain = Math.max(0, Math.min(1, route.sustain));
@@ -49,7 +58,9 @@ function processRoute(
     const nextEnvelope =
       envelope + (targetEnvelope - envelope) * (isRising ? attack : decay);
 
-    previous[stateKey(route, 'envelope')] = Number.isFinite(nextEnvelope)
+    previous[getRouteStateKey(route.id, 'envelope')] = Number.isFinite(
+      nextEnvelope,
+    )
       ? nextEnvelope
       : envelope;
     previous[sourceKey] = sourceValue;
@@ -66,6 +77,8 @@ function processRoute(
     return prev + nextVelocity;
   }
 
+  // Default: lerp (smoothing)
+  if (!hasPrev) return mappedValue;
   return prev + (mappedValue - prev) * route.smoothing;
 }
 
@@ -87,7 +100,7 @@ export function applyRouting(
     if (route.gatewayMode === 'active') {
       const threshold = route.gatewayThreshold ?? 0;
       const decay = route.gatewayDecay ?? 1;
-      const gateKey = stateKey(route, 'gateState');
+      const gateKey = getRouteStateKey(route.id, 'gateState');
       let gateState = previous[gateKey] ?? 0;
 
       if (sourceValue > threshold) {
@@ -104,9 +117,34 @@ export function applyRouting(
     const mappedValue =
       route.min + gatedSourceValue * route.amount * (route.max - route.min);
     const next = processRoute(route, gatedSourceValue, mappedValue, previous);
-    const safeNext = Number.isFinite(next) ? next : 0;
+    let safeNext = Number.isFinite(next) ? next : 0;
 
-    previous[stateKey(route, 'value')] = safeNext;
+    // Opcjonalny etap wygładzania (Smoothing)
+    if (route.smoothingActive) {
+      const smoothKey = getRouteStateKey(route.id, 'smoothedValue');
+      const prevSmooth = previous[smoothKey] ?? safeNext;
+      const p = route.smoothWeightPrev ?? 0.8;
+      const r = route.smoothWeightNew ?? 0.2;
+      safeNext = prevSmooth * p + safeNext * r;
+      previous[smoothKey] = safeNext;
+    }
+
+    // NOWE: Etap Post-Lerp (current += (target - current) * amount)
+    if (route.lerpActive) {
+      const lerpKey = getRouteStateKey(route.id, 'lerpState');
+      const prevLerp = previous[lerpKey] ?? safeNext;
+      const amt = route.lerpAmount ?? 0.1;
+      safeNext = prevLerp + (safeNext - prevLerp) * amt;
+      previous[lerpKey] = safeNext;
+    }
+
+    const stateKey = getRouteStateKey(route.id, 'value');
+
+    // Zapisujemy w obu obiektach:
+    // previous (trwały stan między klatkami) i routed (wynik dla skeczu i UI)
+    previous[stateKey] = safeNext;
+    routed[stateKey] = safeNext;
+
     routed[route.target] = (routed[route.target] ?? 0) + safeNext;
   }
 

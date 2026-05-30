@@ -24,6 +24,7 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   lastKickTime: 0,
   kickEnergy: 0,
   nyquist: 22050,
+  fps: 0,
   dataArray: [],
 };
 
@@ -51,6 +52,7 @@ export function processAudioBands(
   sampleRate: number,
   currentBands: Partial<ReactiveSignals> = EMPTY_SIGNALS,
   customConfig: Partial<typeof DEFAULT_AUDIO_BAND_CONFIG> = {},
+  fps: number = 0,
 ): ReactiveSignals {
   const config = { ...DEFAULT_AUDIO_BAND_CONFIG, ...customConfig };
   const normalizedDataArray = new Array<number>(dataArray.length).fill(0);
@@ -155,6 +157,7 @@ export function processAudioBands(
     lastKickTime: newLastKickTime,
     kickEnergy,
     nyquist: maxFreq,
+    fps,
     dataArray: normalizedDataArray,
   };
 }
