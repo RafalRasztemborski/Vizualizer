@@ -472,6 +472,33 @@ export const dupaSketch: P5SketchModule = {
       defaultValue: 90,
     },
     {
+      key: 'sidePulseMult',
+      label: 'Side pulse mult',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'topBottomPulseMult',
+      label: 'T/B pulse mult',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'frontBackPulseMult',
+      label: 'F/B pulse mult',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
       key: 'trailAlpha',
       label: 'Trail alpha',
       type: 'number',
@@ -751,9 +778,13 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const totalHeight = yRows * stepY;
   const totalDepth = zRows * stepZ;
   const t = timeMs * 0.001;
-  const sidePulse = signals.bass * 0.75 + signals.kickEnergy * 1.8;
-  const topBottomPulse = signals.mid;
-  const frontBackPulse = signals.high;
+  const sidePulse =
+    (signals.bass * 0.75 + signals.kickEnergy * 1.8) *
+    routedNumber(params, routedParams, 'sidePulseMult', 1);
+  const topBottomPulse =
+    signals.mid * routedNumber(params, routedParams, 'topBottomPulseMult', 1);
+  const frontBackPulse =
+    signals.high * routedNumber(params, routedParams, 'frontBackPulseMult', 1);
   const spectrum = signals.dataArray;
   const nyquist = signals.nyquist;
   const edgeWeight = Math.max(
