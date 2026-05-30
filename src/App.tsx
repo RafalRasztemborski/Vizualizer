@@ -112,6 +112,10 @@ function createRouteForTarget(
   return route;
 }
 
+function wrapDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
+}
+
 export function App() {
   const [selectedSketchId, setSelectedSketchId] = useState(sketches[0].id);
   const selectedSketch = useMemo(
@@ -236,6 +240,12 @@ export function App() {
         .map((param) => param.key),
     [selectedSketch],
   );
+  const supportsDragRotate = useMemo(
+    () =>
+      selectedSketch.params.some((param) => param.key === 'X_ROTATE') &&
+      selectedSketch.params.some((param) => param.key === 'Y_ROTATE'),
+    [selectedSketch],
+  );
 
   return (
     <main className="appShell">
@@ -243,6 +253,22 @@ export function App() {
         key={selectedSketch.id}
         sketch={selectedSketch}
         runtimeRef={runtimeRef}
+        onRotateDrag={
+          supportsDragRotate
+            ? (deltaX, deltaY) => {
+                const sensitivity = 0.35;
+                setParams((current) => ({
+                  ...current,
+                  X_ROTATE: wrapDegrees(
+                    Number(current.X_ROTATE ?? 0) + deltaY * sensitivity,
+                  ),
+                  Y_ROTATE: wrapDegrees(
+                    Number(current.Y_ROTATE ?? 0) + deltaX * sensitivity,
+                  ),
+                }));
+              }
+            : undefined
+        }
       />
 
       <AnalyzerPanel

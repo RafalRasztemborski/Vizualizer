@@ -599,6 +599,54 @@ export const dupaSketch: P5SketchModule = {
       defaultValue: 0.75,
     },
     {
+      key: 'leftRightEdgeAlign',
+      label: 'L/R edge align',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'leftRightEdgeAlignAmount',
+      label: 'L/R align amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.8,
+    },
+    {
+      key: 'leftRightEdgeAlignRadius',
+      label: 'L/R align radius',
+      type: 'number',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.75,
+    },
+    {
+      key: 'topBottomEdgeAlign',
+      label: 'T/B edge align',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'topBottomEdgeAlignAmount',
+      label: 'T/B align amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.8,
+    },
+    {
+      key: 'topBottomEdgeAlignRadius',
+      label: 'T/B align radius',
+      type: 'number',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.75,
+    },
+    {
       key: 'frontFormula',
       label: 'Front formula',
       type: 'select',
@@ -1033,6 +1081,38 @@ function wallEdgeOffset(
   return (direction === 'positive' ? 1 : -1) * (anim / 2);
 }
 
+function frontBackWallEdgeOffset(
+  formula: SketchParams[string],
+  direction: 'negative' | 'positive',
+  anim: number,
+) {
+  if (formula !== 'new') return 0;
+  return (direction === 'positive' ? 1 : -1) * (anim * 1.5);
+}
+
+function frontBackWallAnim(
+  x: number,
+  y: number,
+  xRows: number,
+  yRows: number,
+  audioDepth: number,
+  frontBackPulse: number,
+  spectrum: number[],
+  nyquist: number,
+) {
+  const falloff = sineFalloff(x, xRows) * sineFalloff(y, yRows);
+  const spectralEnergy = spectrumValueHz(
+    spectrum,
+    nyquist,
+    serpentinePosition(x, xRows, y, yRows),
+    2500,
+    12000,
+  );
+  const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
+
+  return falloff * energy * audioDepth;
+}
+
 function topBottomWallAnim(
   x: number,
   z: number,
@@ -1083,6 +1163,7 @@ function drawLeftRightWalls({
   p,
   params,
   routedParams,
+  xRows,
   yRows,
   zRows,
   xSize,
@@ -1096,12 +1177,22 @@ function drawLeftRightWalls({
   totalDepth,
   audioDepth,
   sidePulse,
+  topBottomPulse,
+  frontBackPulse,
   spectrum,
   nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
     routedNumber(params, routedParams, 'Crazy_z_position', 0) / 100;
+  const edgeAlignEnabled = boolParam(params, 'leftRightEdgeAlign', false);
+  const edgeAlignAmount = clamp01(
+    routedNumber(params, routedParams, 'leftRightEdgeAlignAmount', 0.8),
+  );
+  const edgeAlignRadius = Math.max(
+    0.05,
+    routedNumber(params, routedParams, 'leftRightEdgeAlignRadius', 0.75),
+  );
 
   for (let y = 1; y < yRows - 1; y += 1) {
     const falloffY = sineFalloff(y, yRows);
@@ -1122,6 +1213,23 @@ function drawLeftRightWalls({
       const warpedZ = pz + pz * crazyZ;
       const leftMethod = params.leftFormula ?? 'new';
       const rightMethod = params.rightFormula ?? 'new';
+      const edgeAlign = edgeAlignEnabled
+        ? leftRightEdgeAlignment({
+            params,
+            xRows,
+            y,
+            z,
+            yRows,
+            zRows,
+            audioDepth,
+            topBottomPulse,
+            frontBackPulse,
+            spectrum,
+            nyquist,
+            amount: edgeAlignAmount,
+            radius: edgeAlignRadius,
+          })
+        : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
         const px =
@@ -1132,8 +1240,8 @@ function drawLeftRightWalls({
         drawBox(
           p,
           px,
-          py,
-          warpedZ,
+          py + edgeAlign.left.y,
+          warpedZ + edgeAlign.left.z,
           xSize + anim,
           ySize,
           zSize,
@@ -1150,8 +1258,8 @@ function drawLeftRightWalls({
         drawBox(
           p,
           px,
-          py,
-          warpedZ,
+          py + edgeAlign.right.y,
+          warpedZ + edgeAlign.right.z,
           xSize + anim,
           ySize,
           zSize,
@@ -1162,11 +1270,127 @@ function drawLeftRightWalls({
   }
 }
 
+type LeftRightEdgeAlignmentArgs = {
+  params: SketchParams;
+  xRows: number;
+  y: number;
+  z: number;
+  yRows: number;
+  zRows: number;
+  audioDepth: number;
+  topBottomPulse: number;
+  frontBackPulse: number;
+  spectrum: number[];
+  nyquist: number;
+  amount: number;
+  radius: number;
+};
+
+function leftRightEdgeAlignment(args: LeftRightEdgeAlignmentArgs) {
+  return {
+    left: leftRightEdgeAlignmentForX({ ...args, x: 1 }),
+    right: leftRightEdgeAlignmentForX({ ...args, x: args.xRows - 2 }),
+  };
+}
+
+function leftRightEdgeAlignmentForX({
+  params,
+  x,
+  y,
+  z,
+  xRows,
+  yRows,
+  zRows,
+  audioDepth,
+  topBottomPulse,
+  frontBackPulse,
+  spectrum,
+  nyquist,
+  amount,
+  radius,
+}: LeftRightEdgeAlignmentArgs & { x: number }) {
+  const topWeight = edgeSideWeight(y, yRows, 'min', radius);
+  const bottomWeight = edgeSideWeight(y, yRows, 'max', radius);
+  const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
+  const backWeight = edgeSideWeight(z, zRows, 'max', radius);
+
+  const topOffset = wallEnabled(params, 'top')
+    ? wallEdgeOffset(
+        params.topFormula ?? 'new',
+        'positive',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const bottomOffset = wallEnabled(params, 'bottom')
+    ? wallEdgeOffset(
+        params.bottomFormula ?? 'new',
+        'negative',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const frontOffset = wallEnabled(params, 'front')
+    ? frontBackWallEdgeOffset(
+        params.frontFormula ?? 'new',
+        'negative',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const backOffset = wallEnabled(params, 'back')
+    ? frontBackWallEdgeOffset(
+        params.backFormula ?? 'new',
+        'positive',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+
+  return {
+    y: (topOffset * topWeight + bottomOffset * bottomWeight) * amount,
+    z: (frontOffset * frontWeight + backOffset * backWeight) * amount,
+  };
+}
+
 function drawTopBottomWalls({
   p,
   params,
   routedParams,
   xRows,
+  yRows,
   zRows,
   xSize,
   ySize,
@@ -1178,13 +1402,23 @@ function drawTopBottomWalls({
   totalHeight,
   totalDepth,
   audioDepth,
+  sidePulse,
   topBottomPulse,
+  frontBackPulse,
   spectrum,
   nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
     routedNumber(params, routedParams, 'Crazy_z_position', 0) / 100;
+  const edgeAlignEnabled = boolParam(params, 'topBottomEdgeAlign', false);
+  const edgeAlignAmount = clamp01(
+    routedNumber(params, routedParams, 'topBottomEdgeAlignAmount', 0.8),
+  );
+  const edgeAlignRadius = Math.max(
+    0.05,
+    routedNumber(params, routedParams, 'topBottomEdgeAlignRadius', 0.75),
+  );
 
   for (let x = 1; x < xRows - 1; x += 1) {
     const falloffX = sineFalloff(x, xRows);
@@ -1205,6 +1439,23 @@ function drawTopBottomWalls({
       const warpedZ = pz + pz * crazyZ;
       const topMethod = params.topFormula ?? 'new';
       const bottomMethod = params.bottomFormula ?? 'new';
+      const edgeAlign = edgeAlignEnabled
+        ? topBottomEdgeAlignment({
+            params,
+            x,
+            z,
+            xRows,
+            yRows,
+            zRows,
+            audioDepth,
+            sidePulse,
+            frontBackPulse,
+            spectrum,
+            nyquist,
+            amount: edgeAlignAmount,
+            radius: edgeAlignRadius,
+          })
+        : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
         const py =
@@ -1214,9 +1465,9 @@ function drawTopBottomWalls({
 
         drawBox(
           p,
-          px,
+          px + edgeAlign.top.x,
           py,
-          warpedZ,
+          warpedZ + edgeAlign.top.z,
           xSize,
           ySize + anim,
           zSize,
@@ -1232,9 +1483,9 @@ function drawTopBottomWalls({
 
         drawBox(
           p,
-          px,
+          px + edgeAlign.bottom.x,
           py,
-          warpedZ,
+          warpedZ + edgeAlign.bottom.z,
           xSize,
           ySize + anim,
           zSize,
@@ -1243,4 +1494,119 @@ function drawTopBottomWalls({
       }
     }
   }
+}
+
+type TopBottomEdgeAlignmentArgs = {
+  params: SketchParams;
+  x: number;
+  z: number;
+  xRows: number;
+  yRows: number;
+  zRows: number;
+  audioDepth: number;
+  sidePulse: number;
+  frontBackPulse: number;
+  spectrum: number[];
+  nyquist: number;
+  amount: number;
+  radius: number;
+};
+
+function topBottomEdgeAlignment(args: TopBottomEdgeAlignmentArgs) {
+  return {
+    top: topBottomEdgeAlignmentForY({ ...args, y: 1 }),
+    bottom: topBottomEdgeAlignmentForY({ ...args, y: args.yRows - 2 }),
+  };
+}
+
+function topBottomEdgeAlignmentForY({
+  params,
+  x,
+  y,
+  z,
+  xRows,
+  yRows,
+  zRows,
+  audioDepth,
+  sidePulse,
+  frontBackPulse,
+  spectrum,
+  nyquist,
+  amount,
+  radius,
+}: TopBottomEdgeAlignmentArgs & { y: number }) {
+  const leftWeight = edgeSideWeight(x, xRows, 'min', radius);
+  const rightWeight = edgeSideWeight(x, xRows, 'max', radius);
+  const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
+  const backWeight = edgeSideWeight(z, zRows, 'max', radius);
+
+  const leftOffset = wallEnabled(params, 'left')
+    ? wallEdgeOffset(
+        params.leftFormula ?? 'new',
+        'negative',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const rightOffset = wallEnabled(params, 'right')
+    ? wallEdgeOffset(
+        params.rightFormula ?? 'new',
+        'positive',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const frontOffset = wallEnabled(params, 'front')
+    ? frontBackWallEdgeOffset(
+        params.frontFormula ?? 'new',
+        'negative',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const backOffset = wallEnabled(params, 'back')
+    ? frontBackWallEdgeOffset(
+        params.backFormula ?? 'new',
+        'positive',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+
+  return {
+    x: (leftOffset * leftWeight + rightOffset * rightWeight) * amount,
+    z: (frontOffset * frontWeight + backOffset * backWeight) * amount,
+  };
 }

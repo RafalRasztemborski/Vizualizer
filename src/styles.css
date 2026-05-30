@@ -70,10 +70,18 @@ input[type='range'] {
   min-width: 0;
   min-height: 0;
   background: #050809;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.canvasHost:active {
+  cursor: grabbing;
 }
 
 .canvasHost canvas {
   display: block;
+  pointer-events: none;
 }
 
 .sidebar {
