@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioEngine } from './audio/AudioEngine';
 import { EMPTY_SIGNALS } from './audio/audioBands';
 import { MidiManager } from './midi/MidiManager';
@@ -184,6 +184,11 @@ export function App() {
 
   useEffect(() => () => audioRef.current.dispose(), []);
 
+  const handleConfigChange = useCallback((key: string, value: number) => {
+    audioRef.current.setConfigValue(key, value);
+    setAudioVersion((version) => version + 1);
+  }, []);
+
   const sourceKeys = useMemo(() => {
     const signalKeys = Object.keys(numericSignals(signals)).sort();
     const extraMidiKeys = Object.keys(midi)
@@ -234,10 +239,7 @@ export function App() {
         config={audioRef.current.config}
         signals={signals}
         fps={fps}
-        onConfigChange={(key, value) => {
-          audioRef.current.setConfigValue(key, value);
-          setAudioVersion((version) => version + 1);
-        }}
+        onConfigChange={handleConfigChange}
       />
 
       <aside className="sidebar">
