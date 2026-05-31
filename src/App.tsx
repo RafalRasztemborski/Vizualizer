@@ -139,15 +139,37 @@ export function App() {
   const [routes, setRoutes] = useState<RouteMapping[]>(() =>
     defaultRoutesForSketch(selectedSketchId),
   );
-  const signalRouter = useMemo(() => {
+
+  const [signalRouters, setSignalRouters] = useState<SignalRouter[]>(() => {
     const router = new SignalRouter();
-    // Inicjalizacja stałych kotwic pipeline'u
     const src = new SourceNode('anchor-source', 'bass');
     const tgt = new TargetNode('anchor-target', 'audioDepth');
     router.addNode(src);
     router.addNode(tgt);
-    return router;
-  }, []);
+    return [router];
+  });
+
+  const addSignalRouter = () => {
+    const router = new SignalRouter();
+    const trackId = crypto.randomUUID().slice(0, 8);
+    router.addNode(
+      new SourceNode(`anchor-source-${trackId}`, sourceKeys[0] || 'bass'),
+    );
+    router.addNode(
+      new TargetNode(`anchor-target-${trackId}`, targetKeys[0] || 'audioDepth'),
+    );
+    setSignalRouters((prev) => [...prev, router]);
+    setRouterVersion((v) => v + 1);
+  };
+
+  const removeSignalRouter = (index: number) => {
+    if (signalRouters.length <= 1) return;
+    const next = [...signalRouters];
+    next.splice(index, 1);
+    setSignalRouters(next);
+    setRouterVersion((v) => v + 1);
+  };
+
   const [, setRouterVersion] = useState(0);
   const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
@@ -199,17 +221,19 @@ export function App() {
         routedRef.current,
       );
 
-      // Nowy system: Przetwarzanie grafu sygnałów
-      signalRouter.update(sources);
+      // Przetwarzanie wszystkich grafów sygnałów
+      for (const router of signalRouters) {
+        router.update(sources);
 
-      // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
-      const currentNodes = signalRouter.getNodes();
-      for (const node of currentNodes) {
-        if (node instanceof TargetNode) {
-          const val = node.inputs.in.value;
-          if (typeof val === 'number') {
-            nextRouted[node.targetParam] =
-              (nextRouted[node.targetParam] ?? 0) + val;
+        // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
+        const currentNodes = router.getNodes();
+        for (const node of currentNodes) {
+          if (node instanceof TargetNode) {
+            const val = node.inputs.in.value;
+            if (typeof val === 'number') {
+              nextRouted[node.targetParam] =
+                (nextRouted[node.targetParam] ?? 0) + val;
+            }
           }
         }
       }
@@ -246,7 +270,7 @@ export function App() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [params, routes]);
+  }, [params, routes, signalRouters]);
 
   useEffect(() => () => audioRef.current.dispose(), []);
 
@@ -384,10 +408,12 @@ export function App() {
       </aside>
 
       <PipelineEditor
-        router={signalRouter}
+        routers={signalRouters}
         sourceKeys={sourceKeys}
         targetKeys={targetKeys}
         onUpdate={() => setRouterVersion((v) => v + 1)}
+        onAddRoute={addSignalRouter}
+        onRemoveRoute={removeSignalRouter}
       />
     </main>
   );

@@ -33,7 +33,7 @@ export class SignalRouter {
 
   removeNode(nodeId: string) {
     // Nie pozwól usunąć kotwic
-    if (nodeId === 'anchor-source' || nodeId === 'anchor-target') return;
+    if (nodeId.startsWith('anchor-')) return;
     this.nodes.delete(nodeId);
     this.pipeline = this.pipeline.filter((id) => id !== nodeId);
     this.connections = this.connections.filter(
