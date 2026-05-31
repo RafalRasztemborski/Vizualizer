@@ -6,7 +6,6 @@ export {
   processAudioBands,
 } from './src/audio/audioBands';
 export { MidiManager } from './src/midi/MidiManager';
-export { applyRouting, createRoute } from './src/routing/routing';
 export { sketches } from './src/sketches/registry';
 export type {
   AnalyzerConfig,
@@ -14,7 +13,6 @@ export type {
   P5SketchModule,
   ParamDefinition,
   ReactiveSignals,
-  RouteMapping,
   RuntimeFrame,
   SketchParamDefinition,
   SketchParams,

@@ -3,11 +3,9 @@ import { AudioEngine } from './audio/AudioEngine';
 import { EMPTY_SIGNALS } from './audio/audioBands';
 import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
-import { applyRouting, createRoute } from './routing/routing';
 import { sketches } from './sketches/registry';
 import { AnalyzerPanel } from './ui/AnalyzerPanel';
 import { ParameterControls } from './ui/ParameterControls';
-import { RoutingMatrix } from './ui/RoutingMatrix';
 import { SignalRouter } from './ui/SignalRouter';
 import { SignalRouterUI } from './ui/SignalRouterUI';
 import { Transport } from './ui/Transport';
@@ -17,7 +15,6 @@ import { PipelineEditor } from './ui/PipelineEditor';
 import type {
   NumericRecord,
   ReactiveSignals,
-  RouteMapping,
   SketchParams,
   SketchParamValue,
 } from './core/types';
@@ -42,81 +39,6 @@ function defaultParamsForSketch(sketchId: string): SketchParams {
   );
 }
 
-function defaultRoutesForSketch(sketchId: string): RouteMapping[] {
-  if (sketchId === 'dupa') {
-    return [
-      {
-        ...createRoute('cleanedBass', 'X_GAP'),
-        amount: 1,
-        min: 0,
-        max: 55,
-        processor: 'envelope',
-        smoothing: 0.45,
-      },
-      {
-        ...createRoute('bass', 'audioDepth'),
-        amount: 1,
-        min: 0,
-        max: 320,
-        smoothing: 0.25,
-      },
-    ];
-  }
-
-  if (sketchId === 'particle-tunnel') {
-    return [
-      {
-        ...createRoute('kickEnergy', 'particleSpeed'),
-        amount: 1.2,
-        min: 0,
-        max: 8,
-        smoothing: 0.35,
-      },
-      {
-        ...createRoute('cc74', 'hue'),
-        amount: 1,
-        min: 0,
-        max: 360,
-        smoothing: 0.18,
-      },
-    ];
-  }
-
-  return [
-    {
-      ...createRoute('bass', 'wallAmplitude'),
-      amount: 1.4,
-      min: 0,
-      max: 180,
-      smoothing: 0.18,
-    },
-    {
-      ...createRoute('high', 'hue'),
-      amount: 1,
-      min: 0,
-      max: 180,
-      smoothing: 0.2,
-    },
-  ];
-}
-
-function createRouteForTarget(
-  source: string,
-  target: string,
-  sketchId: string,
-): RouteMapping {
-  const route = createRoute(source, target);
-  const sketch = sketches.find((item) => item.id === sketchId) ?? sketches[0];
-  const definition = sketch.params.find((param) => param.key === target);
-
-  if (definition?.type === 'number') {
-    route.min = 0;
-    route.max = Math.max(definition.step, definition.max - definition.min);
-  }
-
-  return route;
-}
-
 function wrapDegrees(value: number) {
   return ((value % 360) + 360) % 360;
 }
@@ -136,9 +58,6 @@ export function App() {
   const [signals, setSignals] = useState<ReactiveSignals>({ ...EMPTY_SIGNALS });
   const [midi, setMidi] = useState<NumericRecord>({});
   const [routedParams, setRoutedParams] = useState<NumericRecord>({});
-  const [routes, setRoutes] = useState<RouteMapping[]>(() =>
-    defaultRoutesForSketch(selectedSketchId),
-  );
 
   const [signalRouters, setSignalRouters] = useState<SignalRouter[]>(() => {
     const router = new SignalRouter();
@@ -175,7 +94,6 @@ export function App() {
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
   const midiRef = useRef(new MidiManager());
-  const routedRef = useRef<NumericRecord>({});
   const fpsRef = useRef({
     frames: 0,
     lastSample: performance.now(),
@@ -191,8 +109,6 @@ export function App() {
     const nextParams = defaultParamsForSketch(selectedSketchId);
     setParams(nextParams);
     setRoutedParams({});
-    setRoutes(defaultRoutesForSketch(selectedSketchId));
-    routedRef.current = {};
     runtimeRef.current = {
       ...runtimeRef.current,
       params: nextParams,
@@ -214,12 +130,7 @@ export function App() {
       const nextSignals = audioRef.current.update();
       const nextMidi = midiRef.current.currentValues;
       const sources = { ...numericSignals(nextSignals), ...nextMidi };
-      const nextRouted = applyRouting(
-        runtimeRef.current.params,
-        routes,
-        sources,
-        routedRef.current,
-      );
+      const nextRouted: NumericRecord = {};
 
       // Przetwarzanie wszystkich grafów sygnałów
       for (const router of signalRouters) {
@@ -238,7 +149,6 @@ export function App() {
         }
       }
 
-      routedRef.current = nextRouted;
       runtimeRef.current = {
         params: runtimeRef.current.params,
         signals: nextSignals,
@@ -270,14 +180,9 @@ export function App() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [params, routes, signalRouters]);
+  }, [params, signalRouters]);
 
   useEffect(() => () => audioRef.current.dispose(), []);
-
-  const routeSourceValues = useMemo(
-    () => ({ ...numericSignals(signals), ...midi }),
-    [signals, midi],
-  );
 
   const sourceKeys = useMemo(() => {
     const signalKeys = Object.keys(numericSignals(signals)).sort();
@@ -378,32 +283,6 @@ export function App() {
           onChange={(key: string, value: SketchParamValue) => {
             setParams((current) => ({ ...current, [key]: value }));
           }}
-        />
-
-        <RoutingMatrix
-          routes={routes}
-          routeStates={routedParams}
-          sourceKeys={sourceKeys}
-          sourceValues={routeSourceValues}
-          targetKeys={targetKeys}
-          onAdd={() =>
-            setRoutes((current) => [
-              ...current,
-              createRouteForTarget(
-                sourceKeys[0],
-                targetKeys[0],
-                selectedSketchId,
-              ),
-            ])
-          }
-          onChange={(route) =>
-            setRoutes((current) =>
-              current.map((item) => (item.id === route.id ? route : item)),
-            )
-          }
-          onRemove={(id) =>
-            setRoutes((current) => current.filter((route) => route.id !== id))
-          }
         />
       </aside>
 
