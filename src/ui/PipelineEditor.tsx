@@ -14,324 +14,330 @@ import {
   StrengthenerMode,
 } from './SignalStrengthenerProNode';
 
-export const PipelineEditor: React.FC<{
+export const PipelineEditor = React.memo<{
   routers: SignalRouter[];
   sourceKeys: string[];
   targetKeys: string[];
   onUpdate: () => void;
   onAddRoute: () => void;
   onRemoveRoute: (index: number) => void;
-}> = ({
-  routers,
-  sourceKeys,
-  targetKeys,
-  onUpdate,
-  onAddRoute,
-  onRemoveRoute,
-}) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  // State przechowujący pozycję: [indexŚcieżki, indexGdzieWstawić]
-  const [selectorPos, setSelectorPos] = useState<[number, number] | null>(null);
+}>(
+  ({
+    routers,
+    sourceKeys,
+    targetKeys,
+    onUpdate,
+    onAddRoute,
+    onRemoveRoute,
+  }) => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    // State przechowujący pozycję: [indexŚcieżki, indexGdzieWstawić]
+    const [selectorPos, setSelectorPos] = useState<[number, number] | null>(
+      null,
+    );
 
-  const handleAddNode = (
-    type: string,
-    trackIndex: number,
-    nodeIndex: number,
-  ) => {
-    const router = routers[trackIndex];
-    if (!router) return;
+    const handleAddNode = (
+      type: string,
+      trackIndex: number,
+      nodeIndex: number,
+    ) => {
+      const router = routers[trackIndex];
+      if (!router) return;
 
-    const id = crypto.randomUUID();
-    let node: INode;
+      const id = crypto.randomUUID();
+      let node: INode;
 
-    switch (type) {
-      case 'smoothing':
-        node = new SmoothingNode(id);
-        break;
-      case 'strength':
-        node = new SignalStrengthNode(id);
-        break;
-      case 'lerp':
-        node = new LerpNode(id);
-        break;
-      case 'clamp':
-        node = new ClampNode(id);
-        break;
-      case 'curve':
-        node = new CurveNode(id);
-        break;
-      case 'remap':
-        node = new RemapNode(id);
-        break;
-      case 'strengthener_pro':
-        node = new SignalStrengthenerProNode(id);
-        break;
-      default:
-        return;
-    }
+      switch (type) {
+        case 'smoothing':
+          node = new SmoothingNode(id);
+          break;
+        case 'strength':
+          node = new SignalStrengthNode(id);
+          break;
+        case 'lerp':
+          node = new LerpNode(id);
+          break;
+        case 'clamp':
+          node = new ClampNode(id);
+          break;
+        case 'curve':
+          node = new CurveNode(id);
+          break;
+        case 'remap':
+          node = new RemapNode(id);
+          break;
+        case 'strengthener_pro':
+          node = new SignalStrengthenerProNode(id);
+          break;
+        default:
+          return;
+      }
 
-    router.addNode(node, nodeIndex);
-    setSelectorPos(null);
-    onUpdate();
-  };
+      router.addNode(node, nodeIndex);
+      setSelectorPos(null);
+      onUpdate();
+    };
 
-  return (
-    <div
-      className={`pipeline-container ${isCollapsed ? 'collapsed' : ''}`}
-      style={{
-        overflow: 'hidden',
-        // Zarządzamy wysokością całego okna w zależności od 3 stanów:
-        height: isCollapsed ? '40px' : isExpanded ? '50vh' : '300px',
-        transition: 'height 0.3s ease-in-out',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    return (
       <div
-        className="pipeline-header"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        className={`pipeline-container ${isCollapsed ? 'collapsed' : ''}`}
         style={{
-          position: 'relative',
-          zIndex: 10, // Nagłówek ma stały poziom
-          cursor: 'pointer',
-        }}
-      >
-        <h2>Signal Flow Pipeline Explorer</h2>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {!isCollapsed && (
-            <button
-              className="btn-small"
-              title="Add a new signal path"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onAddRoute();
-              }}
-              style={{
-                background: '#39d2c0',
-                color: '#1a1a1a',
-                fontWeight: 'bold',
-              }}
-            >
-              + Add Path
-            </button>
-          )}
-          {!isCollapsed && (
-            <button
-              className="btn-small"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-              style={{ fontSize: '14px', minWidth: '30px', color: '#39d2c0' }}
-              title={isExpanded ? 'Restore to normal' : 'Expand to half screen'}
-            >
-              {isExpanded ? '▼' : '▲'}
-            </button>
-          )}
-          <button
-            className="btn-small"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              setIsCollapsed(!isCollapsed);
-            }}
-            style={{ fontSize: '14px', minWidth: '30px' }}
-          >
-            {isCollapsed ? '□' : '−'}
-          </button>
-        </div>
-      </div>
-      <div
-        className="pipeline-editor-body"
-        style={{
-          display: isCollapsed ? 'none' : 'flex',
+          overflow: 'hidden',
+          // Zarządzamy wysokością całego okna w zależności od 3 stanów:
+          height: isCollapsed ? '40px' : isExpanded ? '50vh' : '300px',
+          transition: 'height 0.3s ease-in-out',
+          display: 'flex',
           flexDirection: 'column',
-          gap: '30px',
-          padding: '10px',
-          flex: 1, // Wypełnia resztę wysokości kontenera
-          overflowY: 'auto',
-          position: 'relative',
-          zIndex: selectorPos ? 20 : 1,
         }}
       >
-        {!isCollapsed &&
-          routers.map((router, trackIdx) => (
-            <div
-              key={trackIdx}
-              className="pipeline-track-container"
-              style={{
-                borderLeft: '2px solid rgba(57, 210, 192, 0.2)',
-                paddingLeft: '15px',
-                background: 'rgba(255,255,255,0.02)',
-                borderRadius: '4px',
-                position: 'relative',
-                zIndex: selectorPos?.[0] === trackIdx ? 100 : 1,
-                overflow: 'visible', // Zapobiega ucinaniu dropdownu przez kontener ścieżki
-              }}
-            >
-              <div
+        <div
+          className="pipeline-header"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          style={{
+            position: 'relative',
+            zIndex: 10, // Nagłówek ma stały poziom
+            cursor: 'pointer',
+          }}
+        >
+          <h2>Signal Flow Pipeline Explorer</h2>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {!isCollapsed && (
+              <button
+                className="btn-small"
+                title="Add a new signal path"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onAddRoute();
+                }}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '8px 0',
+                  background: '#39d2c0',
+                  color: '#1a1a1a',
+                  fontWeight: 'bold',
                 }}
               >
-                <span
+                + Add Path
+              </button>
+            )}
+            {!isCollapsed && (
+              <button
+                className="btn-small"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                style={{ fontSize: '14px', minWidth: '30px', color: '#39d2c0' }}
+                title={
+                  isExpanded ? 'Restore to normal' : 'Expand to half screen'
+                }
+              >
+                {isExpanded ? '▼' : '▲'}
+              </button>
+            )}
+            <button
+              className="btn-small"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                setIsCollapsed(!isCollapsed);
+              }}
+              style={{ fontSize: '14px', minWidth: '30px' }}
+            >
+              {isCollapsed ? '□' : '−'}
+            </button>
+          </div>
+        </div>
+        <div
+          className="pipeline-editor-body"
+          style={{
+            display: isCollapsed ? 'none' : 'flex',
+            flexDirection: 'column',
+            gap: '30px',
+            padding: '10px',
+            flex: 1, // Wypełnia resztę wysokości kontenera
+            overflowY: 'auto',
+            position: 'relative',
+            zIndex: selectorPos ? 20 : 1,
+          }}
+        >
+          {!isCollapsed &&
+            routers.map((router, trackIdx) => (
+              <div
+                key={trackIdx}
+                className="pipeline-track-container"
+                style={{
+                  borderLeft: '2px solid rgba(57, 210, 192, 0.2)',
+                  paddingLeft: '15px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '4px',
+                  position: 'relative',
+                  zIndex: selectorPos?.[0] === trackIdx ? 100 : 1,
+                  overflow: 'visible', // Zapobiega ucinaniu dropdownu przez kontener ścieżki
+                }}
+              >
+                <div
                   style={{
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    color: '#39d2c0',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 0',
                   }}
                 >
-                  Signal Path #{trackIdx + 1}
-                </span>
-                {routers.length > 1 && (
-                  <button
-                    className="btn-small"
-                    onClick={() => onRemoveRoute(trackIdx)}
+                  <span
                     style={{
-                      color: '#ff4d4d',
-                      border: '1px solid rgba(255,77,77,0.3)',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      color: '#39d2c0',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
                     }}
                   >
-                    Remove Path
-                  </button>
-                )}
-              </div>
-              <div
-                className="pipeline-track"
-                style={{
-                  overflow: 'visible',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {router.getNodes().map((node, i, nodes) => (
-                  <React.Fragment key={node.id}>
-                    <PipelineNodeCard
-                      node={node}
-                      sourceKeys={sourceKeys}
-                      targetKeys={targetKeys}
-                      onRemove={() => {
-                        router.removeNode(node.id);
-                        onUpdate();
+                    Signal Path #{trackIdx + 1}
+                  </span>
+                  {routers.length > 1 && (
+                    <button
+                      className="btn-small"
+                      onClick={() => onRemoveRoute(trackIdx)}
+                      style={{
+                        color: '#ff4d4d',
+                        border: '1px solid rgba(255,77,77,0.3)',
                       }}
-                      onMove={(dir) => {
-                        router.moveNode(i, i + dir);
-                        onUpdate();
-                      }}
-                      isFirst={i === 0}
-                      isLast={i === nodes.length - 1}
-                      onUpdate={onUpdate}
-                    />
-                    {i < nodes.length - 1 && (
-                      <div
-                        className="pipeline-connector"
-                        style={{
-                          position: 'relative',
-                          zIndex:
-                            selectorPos?.[0] === trackIdx &&
-                            selectorPos?.[1] === i + 1
-                              ? 200 // Wyżej niż karty noda
-                              : 1,
+                    >
+                      Remove Path
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="pipeline-track"
+                  style={{
+                    overflow: 'visible',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {router.getNodes().map((node, i, nodes) => (
+                    <React.Fragment key={node.id}>
+                      <PipelineNodeCard
+                        node={node}
+                        sourceKeys={sourceKeys}
+                        targetKeys={targetKeys}
+                        onRemove={() => {
+                          router.removeNode(node.id);
+                          onUpdate();
                         }}
-                      >
-                        <div className="connector-line" />
-                        <div className="pulse" />
-                        <button
-                          className="add-mid-btn"
-                          onClick={() => setSelectorPos([trackIdx, i + 1])}
-                          title="Insert Processor"
+                        onMove={(dir) => {
+                          router.moveNode(i, i + dir);
+                          onUpdate();
+                        }}
+                        isFirst={i === 0}
+                        isLast={i === nodes.length - 1}
+                        onUpdate={onUpdate}
+                      />
+                      {i < nodes.length - 1 && (
+                        <div
+                          className="pipeline-connector"
+                          style={{
+                            position: 'relative',
+                            zIndex:
+                              selectorPos?.[0] === trackIdx &&
+                              selectorPos?.[1] === i + 1
+                                ? 200 // Wyżej niż karty noda
+                                : 1,
+                          }}
                         >
-                          +
-                        </button>
-                        {selectorPos?.[0] === trackIdx &&
-                          selectorPos?.[1] === i + 1 && (
-                            <div
-                              className="node-selector-dropdown"
-                              style={{
-                                zIndex: 1000,
-                                position: 'absolute',
-                                top: '25px', // Gwarantuje, że otworzy się pod przyciskiem +
-                                left: '0',
-                              }}
-                            >
-                              <button
-                                onClick={() =>
-                                  handleAddNode('lerp', trackIdx, i + 1)
-                                }
+                          <div className="connector-line" />
+                          <div className="pulse" />
+                          <button
+                            className="add-mid-btn"
+                            onClick={() => setSelectorPos([trackIdx, i + 1])}
+                            title="Insert Processor"
+                          >
+                            +
+                          </button>
+                          {selectorPos?.[0] === trackIdx &&
+                            selectorPos?.[1] === i + 1 && (
+                              <div
+                                className="node-selector-dropdown"
+                                style={{
+                                  zIndex: 1000,
+                                  position: 'absolute',
+                                  top: '25px', // Gwarantuje, że otworzy się pod przyciskiem +
+                                  left: '0',
+                                }}
                               >
-                                Lerp
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode('smoothing', trackIdx, i + 1)
-                                }
-                              >
-                                Smoothing
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode('strength', trackIdx, i + 1)
-                                }
-                              >
-                                Strength
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode('clamp', trackIdx, i + 1)
-                                }
-                              >
-                                Clamp
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode('curve', trackIdx, i + 1)
-                                }
-                              >
-                                Curve
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode('remap', trackIdx, i + 1)
-                                }
-                              >
-                                Remap
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddNode(
-                                    'strengthener_pro',
-                                    trackIdx,
-                                    i + 1,
-                                  )
-                                }
-                              >
-                                Strengthener PRO
-                              </button>
-                              <div className="divider" />
-                              <button
-                                className="cancel"
-                                onClick={() => setSelectorPos(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                      </div>
-                    )}
-                  </React.Fragment>
-                ))}
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('lerp', trackIdx, i + 1)
+                                  }
+                                >
+                                  Lerp
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('smoothing', trackIdx, i + 1)
+                                  }
+                                >
+                                  Smoothing
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('strength', trackIdx, i + 1)
+                                  }
+                                >
+                                  Strength
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('clamp', trackIdx, i + 1)
+                                  }
+                                >
+                                  Clamp
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('curve', trackIdx, i + 1)
+                                  }
+                                >
+                                  Curve
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('remap', trackIdx, i + 1)
+                                  }
+                                >
+                                  Remap
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode(
+                                      'strengthener_pro',
+                                      trackIdx,
+                                      i + 1,
+                                    )
+                                  }
+                                >
+                                  Strengthener PRO
+                                </button>
+                                <div className="divider" />
+                                <button
+                                  className="cancel"
+                                  onClick={() => setSelectorPos(null)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  },
+);
 
 // Wyodrębniamy Monitor VU do osobnego, memoizowanego komponentu,
 // aby zmiany wartości nie wymuszały przerysowania całej karty (przycisków, selectów)
@@ -398,7 +404,7 @@ const PipelineNodeCard = React.memo<{
   }) => {
     const inputVal = Object.values(node.inputs)[0]?.value ?? 0;
     const outputVal = Object.values(node.outputs)[0]?.value ?? inputVal;
-    const isPro = node.name.includes('PRO');
+    const isPro = node.name.includes('PRO') || node.id.includes('pro');
 
     const isAnchor = node.id.startsWith('anchor');
 
