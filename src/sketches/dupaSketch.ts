@@ -61,6 +61,7 @@ void main() {
 `;
 
 const state: DupaState = {};
+const RENDER_SCALE = 0.7;
 
 function numberParam(params: SketchParams, key: string, fallback = 0) {
   const value = params[key];
@@ -749,18 +750,44 @@ export const dupaSketch: P5SketchModule = {
     },
   ],
   setup(p) {
-    p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
+    // Wyłączenie antialiasingu i prośba o wysoką wydajność GPU
+    p.setAttributes({
+      antialias: false,
+      powerPreference: 'high-performance' as any,
+    });
+
+    // Skalowanie rozdzielczości (0.5 = 25% pikseli do przeliczenia)
+    const cnv = p.createCanvas(
+      p.windowWidth * RENDER_SCALE,
+      p.windowHeight * RENDER_SCALE,
+      p.WEBGL,
+    );
+    p.pixelDensity(1);
     p.colorMode(p.HSB, 360, 100, 100, 255);
     state.trailShader = p.createShader(
       TRAIL_VERTEX_SHADER,
       TRAIL_FRAGMENT_SHADER,
     );
+
+    // Wymuszenie skalowania CSS (100% zamiast vw/vh, aby nie zasłaniać UI)
+    const canvasEl = (cnv as any).elt as HTMLCanvasElement;
+    if (canvasEl) {
+      canvasEl.style.width = '100%';
+      canvasEl.style.height = '100%';
+      canvasEl.style.imageRendering = 'pixelated'; // Zachowuje ostrość przy upscalingu
+      canvasEl.style.transform = 'translateZ(0)'; // Wymusza oddzielną warstwę kompozytora
+    }
   },
   draw(frame) {
     drawDupa(frame);
   },
   windowResized(p) {
-    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    p.resizeCanvas(p.windowWidth * RENDER_SCALE, p.windowHeight * RENDER_SCALE);
+    const canvasEl = (p as any).canvas as HTMLCanvasElement;
+    if (canvasEl) {
+      canvasEl.style.width = '100%';
+      canvasEl.style.height = '100%';
+    }
   },
 };
 
@@ -837,6 +864,10 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   );
 
   p.push();
+  // Kompensacja "zoomu" wynikającego ze zmniejszenia canvasu.
+  // Skalujemy cały świat o RENDER_SCALE, aby obiekty miały taki sam rozmiar
+  // na ekranie jak przy pełnej rozdzielczości.
+  p.scale(RENDER_SCALE);
   p.translate(0, 0, routedNumber(params, routedParams, 'z_position', 0));
   p.rotateX(
     p.radians(routedNumber(params, routedParams, 'X_ROTATE', 0)) +
