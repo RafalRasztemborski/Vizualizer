@@ -8,7 +8,12 @@ import { sketches } from './sketches/registry';
 import { AnalyzerPanel } from './ui/AnalyzerPanel';
 import { ParameterControls } from './ui/ParameterControls';
 import { RoutingMatrix } from './ui/RoutingMatrix';
+import { SignalRouter } from './ui/SignalRouter';
+import { SignalRouterUI } from './ui/SignalRouterUI';
 import { Transport } from './ui/Transport';
+import { SourceNode } from './ui/SourceNode';
+import { TargetNode } from './ui/TargetNode';
+import { PipelineEditor } from './ui/PipelineEditor';
 import type {
   NumericRecord,
   ReactiveSignals,
@@ -134,6 +139,16 @@ export function App() {
   const [routes, setRoutes] = useState<RouteMapping[]>(() =>
     defaultRoutesForSketch(selectedSketchId),
   );
+  const signalRouter = useMemo(() => {
+    const router = new SignalRouter();
+    // Inicjalizacja stałych kotwic pipeline'u
+    const src = new SourceNode('anchor-source', 'bass');
+    const tgt = new TargetNode('anchor-target', 'audioDepth');
+    router.addNode(src);
+    router.addNode(tgt);
+    return router;
+  }, []);
+  const [, setRouterVersion] = useState(0);
   const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
@@ -183,6 +198,22 @@ export function App() {
         sources,
         routedRef.current,
       );
+
+      // Nowy system: Przetwarzanie grafu sygnałów
+      signalRouter.update(sources);
+
+      // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
+      const currentNodes = signalRouter.getNodes();
+      for (const node of currentNodes) {
+        if (node instanceof TargetNode) {
+          const val = node.inputs.in.value;
+          if (typeof val === 'number') {
+            nextRouted[node.targetParam] =
+              (nextRouted[node.targetParam] ?? 0) + val;
+          }
+        }
+      }
+
       routedRef.current = nextRouted;
       runtimeRef.current = {
         params: runtimeRef.current.params,
@@ -351,6 +382,13 @@ export function App() {
           }
         />
       </aside>
+
+      <PipelineEditor
+        router={signalRouter}
+        sourceKeys={sourceKeys}
+        targetKeys={targetKeys}
+        onUpdate={() => setRouterVersion((v) => v + 1)}
+      />
     </main>
   );
 }
