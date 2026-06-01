@@ -16,6 +16,10 @@ type BoxColor = {
   edgeAlpha: number;
 };
 
+type DupaState = {
+  trailShader?: p5.Shader;
+};
+
 const WALL_PARAM: Record<WallName, string> = {
   front: 'showFrontWall',
   back: 'showBackWall',
@@ -24,6 +28,40 @@ const WALL_PARAM: Record<WallName, string> = {
   top: 'showTopWall',
   bottom: 'showBottomWall',
 };
+
+const TRAIL_VERTEX_SHADER = `
+precision mediump float;
+
+attribute vec3 aPosition;
+
+void main() {
+  gl_Position = vec4(aPosition.xy, 0.0, 1.0);
+}
+`;
+
+const TRAIL_FRAGMENT_SHADER = `
+precision mediump float;
+
+uniform float uAlpha;
+uniform float uScanlineAmount;
+uniform float uScanlineCount;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform vec3 uTopColor;
+uniform vec3 uBottomColor;
+
+void main() {
+  float y = clamp(gl_FragCoord.y / max(uResolution.y, 1.0), 0.0, 1.0);
+  vec3 color = mix(uBottomColor, uTopColor, y);
+  float scan = sin((gl_FragCoord.y + uTime * 24.0) * uScanlineCount);
+  float scanMask = mix(1.0, 0.58 + 0.42 * smoothstep(-0.2, 0.75, scan), uScanlineAmount);
+  color *= scanMask;
+  gl_FragColor = vec4(color, uAlpha);
+}
+`;
+
+const state: DupaState = {};
+const RENDER_SCALE = 0.7;
 
 function numberParam(params: SketchParams, key: string, fallback = 0) {
   const value = params[key];
@@ -48,15 +86,45 @@ function wallEnabled(params: SketchParams, wall: WallName) {
   return boolParam(params, WALL_PARAM[wall], true);
 }
 
-function clearWebglTrail(p: p5, alpha: number) {
+function clearWebglTrail(
+  p: p5,
+  alpha: number,
+  mode: SketchParams[string],
+  scanlineAmount: number,
+  scanlineCount: number,
+  timeMs: number,
+) {
   const gl = p.drawingContext as WebGLRenderingContext;
 
   p.push();
   p.resetMatrix();
   gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   p.noStroke();
-  p.fill(0, 0, 0, alpha);
-  p.rect(-p.width / 2, -p.height / 2, p.width, p.height);
+
+  if (mode === 'gradient' && state.trailShader) {
+    p.shader(state.trailShader);
+    state.trailShader.setUniform('uAlpha', clamp01(alpha / 255));
+    state.trailShader.setUniform('uScanlineAmount', scanlineAmount);
+    state.trailShader.setUniform('uScanlineCount', scanlineCount);
+    state.trailShader.setUniform('uTime', timeMs * 0.001);
+    state.trailShader.setUniform('uResolution', [p.width, p.height]);
+    state.trailShader.setUniform('uTopColor', [5 / 255, 10 / 255, 30 / 255]);
+    state.trailShader.setUniform('uBottomColor', [0, 0, 0]);
+
+    p.beginShape();
+    p.vertex(-1, -1, 0);
+    p.vertex(1, -1, 0);
+    p.vertex(1, 1, 0);
+    p.vertex(-1, 1, 0);
+    p.endShape(p.CLOSE);
+    p.resetShader();
+  } else {
+    p.fill(0, 0, 0, alpha);
+    p.rect(-p.width / 2, -p.height / 2, p.width, p.height);
+  }
+
   gl.enable(gl.DEPTH_TEST);
   p.pop();
 }
@@ -68,6 +136,29 @@ function sineFalloff(index: number, count: number) {
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep01(value: number) {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+}
+
+function edgeSideWeight(
+  index: number,
+  count: number,
+  side: 'min' | 'max',
+  radius: number,
+) {
+  const innerCount = count - 2;
+  if (innerCount <= 1) return 1;
+
+  const innerIndex = index - 1;
+  const distanceToEdge =
+    side === 'min' ? innerIndex : innerCount - 1 - innerIndex;
+  const distanceToCenter = Math.max(1, (innerCount - 1) / 2);
+  const radiusScale = Math.max(0.01, radius);
+
+  return 1 - smoothstep01(distanceToEdge / distanceToCenter / radiusScale);
 }
 
 function spectrumValueHz(
@@ -205,6 +296,53 @@ export const dupaSketch: P5SketchModule = {
   name: 'Dupa',
   description: 'Reaktywny tunel z szesciennych scian w WEBGL.',
   params: [
+    // --- SEKCJA 1: POZYCJA I ORIENTACJA ---
+    {
+      key: 'z_position',
+      label: 'Tunnel Z Pos',
+      type: 'number',
+      min: -2000,
+      max: 800,
+      step: 1,
+      defaultValue: 0,
+    },
+    {
+      key: 'Crazy_z_position',
+      label: 'Z Warp (Crazy)',
+      type: 'number',
+      min: -50,
+      max: 50,
+      step: 1,
+      defaultValue: 0,
+    },
+    {
+      key: 'rotationSpeed',
+      label: 'Auto-Rot Speed',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'autoRotateX',
+      label: 'Auto Rotate X',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'autoRotateY',
+      label: 'Auto Rotate Y',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'autoRotateZ',
+      label: 'Auto Rotate Z',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    // --- SEKCJA 2: GEOMETRIA SIATKI (GRID) ---
     {
       key: 'X_SIZE',
       label: 'X size',
@@ -316,7 +454,7 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 0,
     },
-
+    // --- SEKCJA 3: WIDOCZNOŚĆ ŚCIAN ---
     {
       key: 'showFrontWall',
       label: 'Front wall',
@@ -353,34 +491,44 @@ export const dupaSketch: P5SketchModule = {
       type: 'boolean',
       defaultValue: true,
     },
-
-    {
-      key: 'z_position',
-      label: 'Z position',
-      type: 'number',
-      min: -2000,
-      max: 800,
-      step: 1,
-      defaultValue: 0,
-    },
-    {
-      key: 'Crazy_z_position',
-      label: 'Crazy Z',
-      type: 'number',
-      min: -50,
-      max: 50,
-      step: 1,
-      defaultValue: 0,
-    },
+    // --- SEKCJA 4: REAKTYWNOŚĆ AUDIO ---
     {
       key: 'audioDepth',
-      label: 'Audio depth',
+      label: 'Audio intensity',
       type: 'number',
       min: 0,
       max: 500,
       step: 1,
       defaultValue: 90,
     },
+    {
+      key: 'sidePulseMult',
+      label: 'Pulse Mult: Sides',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'topBottomPulseMult',
+      label: 'Pulse Mult: T/B',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    {
+      key: 'frontBackPulseMult',
+      label: 'Pulse Mult: F/B',
+      type: 'number',
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 1,
+    },
+    // --- SEKCJA 5: KOLORY I ŚWIATŁO ---
     {
       key: 'trailAlpha',
       label: 'Trail alpha',
@@ -389,6 +537,31 @@ export const dupaSketch: P5SketchModule = {
       max: 255,
       step: 1,
       defaultValue: 255,
+    },
+    {
+      key: 'trailMode',
+      label: 'Trail mode',
+      type: 'select',
+      options: ['solid', 'gradient'],
+      defaultValue: 'solid',
+    },
+    {
+      key: 'scanlineAmount',
+      label: 'Scanline amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.35,
+    },
+    {
+      key: 'scanlineCount',
+      label: 'Scanline count',
+      type: 'number',
+      min: 0.05,
+      max: 1.5,
+      step: 0.01,
+      defaultValue: 0.48,
     },
     {
       key: 'dynamicLight',
@@ -441,6 +614,7 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 255,
     },
+    // --- SEKCJA 6: KRAWĘDZIE I WYRÓWNANIE ---
     {
       key: 'edgeWeight',
       label: 'Edge weight',
@@ -459,16 +633,161 @@ export const dupaSketch: P5SketchModule = {
       step: 1,
       defaultValue: 230,
     },
+    {
+      key: 'frontBackEdgeAlign',
+      label: 'F/B edge align',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'frontBackEdgeAlignAmount',
+      label: 'F/B align amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.8,
+    },
+    {
+      key: 'frontBackEdgeAlignRadius',
+      label: 'F/B align radius',
+      type: 'number',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.75,
+    },
+    {
+      key: 'leftRightEdgeAlign',
+      label: 'L/R edge align',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'leftRightEdgeAlignAmount',
+      label: 'L/R align amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.8,
+    },
+    {
+      key: 'leftRightEdgeAlignRadius',
+      label: 'L/R align radius',
+      type: 'number',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.75,
+    },
+    {
+      key: 'topBottomEdgeAlign',
+      label: 'T/B edge align',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'topBottomEdgeAlignAmount',
+      label: 'T/B align amount',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.8,
+    },
+    {
+      key: 'topBottomEdgeAlignRadius',
+      label: 'T/B align radius',
+      type: 'number',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.75,
+    },
+    {
+      key: 'frontFormula',
+      label: 'Front formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'backFormula',
+      label: 'Back formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    // --- SEKCJA 7: FORMUŁY MATEMATYCZNE ---
+    {
+      key: 'leftFormula',
+      label: 'Left formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'rightFormula',
+      label: 'Right formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'topFormula',
+      label: 'Top formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
+    {
+      key: 'bottomFormula',
+      label: 'Bottom formula',
+      type: 'select',
+      options: ['old', 'new'],
+      defaultValue: 'new',
+    },
   ],
   setup(p) {
-    p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
+    // Wyłączenie antialiasingu i prośba o wysoką wydajność GPU
+    p.setAttributes({
+      antialias: false,
+      powerPreference: 'high-performance' as any,
+    });
+
+    // Skalowanie rozdzielczości (0.5 = 25% pikseli do przeliczenia)
+    const cnv = p.createCanvas(
+      p.windowWidth * RENDER_SCALE,
+      p.windowHeight * RENDER_SCALE,
+      p.WEBGL,
+    );
+    p.pixelDensity(1);
     p.colorMode(p.HSB, 360, 100, 100, 255);
+    state.trailShader = p.createShader(
+      TRAIL_VERTEX_SHADER,
+      TRAIL_FRAGMENT_SHADER,
+    );
+
+    // Wymuszenie skalowania CSS (100% zamiast vw/vh, aby nie zasłaniać UI)
+    const canvasEl = (cnv as any).elt as HTMLCanvasElement;
+    if (canvasEl) {
+      canvasEl.style.width = '100%';
+      canvasEl.style.height = '100%';
+      canvasEl.style.imageRendering = 'pixelated'; // Zachowuje ostrość przy upscalingu
+      canvasEl.style.transform = 'translateZ(0)'; // Wymusza oddzielną warstwę kompozytora
+    }
   },
   draw(frame) {
     drawDupa(frame);
   },
   windowResized(p) {
-    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    p.resizeCanvas(p.windowWidth * RENDER_SCALE, p.windowHeight * RENDER_SCALE);
+    const canvasEl = (p as any).canvas as HTMLCanvasElement;
+    if (canvasEl) {
+      canvasEl.style.width = '100%';
+      canvasEl.style.height = '100%';
+    }
   },
 };
 
@@ -479,6 +798,10 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
       0,
       Math.min(255, routedNumber(params, routedParams, 'trailAlpha', 80)),
     ),
+    params.trailMode ?? 'solid',
+    clamp01(routedNumber(params, routedParams, 'scanlineAmount', 0.35)),
+    Math.max(0.01, routedNumber(params, routedParams, 'scanlineCount', 0.48)),
+    timeMs,
   );
 
   const xSize = Math.max(1, routedNumber(params, routedParams, 'X_SIZE', 20));
@@ -514,9 +837,25 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const totalHeight = yRows * stepY;
   const totalDepth = zRows * stepZ;
   const t = timeMs * 0.001;
-  const sidePulse = signals.bass * 0.75 + signals.kickEnergy * 1.8;
-  const topBottomPulse = signals.mid;
-  const frontBackPulse = signals.high;
+
+  const rotationSpeed = routedNumber(params, routedParams, 'rotationSpeed', 1);
+  const autoRotX = boolParam(params, 'autoRotateX', false)
+    ? t * rotationSpeed
+    : 0;
+  const autoRotY = boolParam(params, 'autoRotateY', false)
+    ? t * rotationSpeed
+    : 0;
+  const autoRotZ = boolParam(params, 'autoRotateZ', false)
+    ? t * rotationSpeed
+    : 0;
+
+  const sidePulse =
+    (signals.bass * 0.75 + signals.kickEnergy * 1.8) *
+    routedNumber(params, routedParams, 'sidePulseMult', 1);
+  const topBottomPulse =
+    signals.mid * routedNumber(params, routedParams, 'topBottomPulseMult', 1);
+  const frontBackPulse =
+    signals.high * routedNumber(params, routedParams, 'frontBackPulseMult', 1);
   const spectrum = signals.dataArray;
   const nyquist = signals.nyquist;
   const edgeWeight = Math.max(
@@ -525,16 +864,25 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   );
 
   p.push();
+  // Kompensacja "zoomu" wynikającego ze zmniejszenia canvasu.
+  // Skalujemy cały świat o RENDER_SCALE, aby obiekty miały taki sam rozmiar
+  // na ekranie jak przy pełnej rozdzielczości.
+  p.scale(RENDER_SCALE);
   p.translate(0, 0, routedNumber(params, routedParams, 'z_position', 0));
   p.rotateX(
     p.radians(routedNumber(params, routedParams, 'X_ROTATE', 0)) +
+      autoRotX +
       Math.sin(t * 0.4) * signals.high * 0.25,
   );
   p.rotateY(
     p.radians(routedNumber(params, routedParams, 'Y_ROTATE', 0)) +
+      autoRotY +
       Math.sin(t * 0.35) * signals.bass * 0.25,
   );
   p.rotateZ(p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)));
+  p.rotateZ(
+    p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)) + autoRotZ,
+  );
 
   p.ambientLight(0, 0, 24 + signals.mid * 18);
   p.directionalLight(0, 0, 96, -0.35, 0.45, -1);
@@ -616,6 +964,7 @@ function drawFrontBackWalls({
   routedParams,
   xRows,
   yRows,
+  zRows,
   xSize,
   ySize,
   zSize,
@@ -626,11 +975,22 @@ function drawFrontBackWalls({
   totalHeight,
   totalDepth,
   audioDepth,
+  sidePulse,
+  topBottomPulse,
   frontBackPulse,
   spectrum,
   nyquist,
   timeMs,
 }: DrawWallsArgs) {
+  const edgeAlignEnabled = boolParam(params, 'frontBackEdgeAlign', false);
+  const edgeAlignAmount = clamp01(
+    routedNumber(params, routedParams, 'frontBackEdgeAlignAmount', 0.8),
+  );
+  const edgeAlignRadius = Math.max(
+    0.05,
+    routedNumber(params, routedParams, 'frontBackEdgeAlignRadius', 0.75),
+  );
+
   for (let x = 1; x < xRows - 1; x += 1) {
     const falloffX = sineFalloff(x, xRows);
 
@@ -647,14 +1007,38 @@ function drawFrontBackWalls({
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
+      const frontMethod = params.frontFormula ?? 'new';
+      const backMethod = params.backFormula ?? 'new';
+      const edgeAlign = edgeAlignEnabled
+        ? frontBackEdgeAlignment({
+            params,
+            routedParams,
+            x,
+            y,
+            xRows,
+            yRows,
+            zRows,
+            audioDepth,
+            sidePulse,
+            topBottomPulse,
+            spectrum,
+            nyquist,
+            amount: edgeAlignAmount,
+            radius: edgeAlignRadius,
+          })
+        : { front: { x: 0, y: 0 }, back: { x: 0, y: 0 } };
 
       if (wallEnabled(params, 'front')) {
+        const pz =
+          frontMethod === 'old'
+            ? -totalDepth / 2 + stepZ / 2 - anim / 2
+            : -totalDepth / 2 + stepZ - anim * 2 - (stepZ - stepZ / 2);
+
         drawBox(
           p,
-          px,
-          py,
-          //-totalDepth / 2 + stepZ / 2 - anim / 2,
-          -totalDepth / 2 + stepZ - anim * 2,
+          px + edgeAlign.front.x,
+          py + edgeAlign.front.y,
+          pz,
           xSize,
           ySize,
           zSize + anim,
@@ -663,13 +1047,16 @@ function drawFrontBackWalls({
       }
 
       if (wallEnabled(params, 'back')) {
+        const pz =
+          backMethod === 'old'
+            ? totalDepth / 2 - stepZ / 2 + anim / 2
+            : totalDepth / 2 - stepZ + anim * 2 + (stepZ - stepZ / 2);
+
         drawBox(
           p,
-          px,
-          py,
-          // -totalWidth / 2 - anim + stepX * 2,
-          //totalDepth / 2 - stepZ / 2 + anim / 2,
-          totalDepth / 2 - stepZ + anim * 2,
+          px + edgeAlign.back.x,
+          py + edgeAlign.back.y,
+          pz,
           xSize,
           ySize,
           zSize + anim,
@@ -680,10 +1067,214 @@ function drawFrontBackWalls({
   }
 }
 
+type FrontBackEdgeAlignmentArgs = {
+  params: SketchParams;
+  routedParams: NumericRecord;
+  x: number;
+  y: number;
+  xRows: number;
+  yRows: number;
+  zRows: number;
+  audioDepth: number;
+  sidePulse: number;
+  topBottomPulse: number;
+  spectrum: number[];
+  nyquist: number;
+  amount: number;
+  radius: number;
+};
+
+function frontBackEdgeAlignment(args: FrontBackEdgeAlignmentArgs) {
+  return {
+    front: frontBackEdgeAlignmentForZ({ ...args, z: 1 }),
+    back: frontBackEdgeAlignmentForZ({ ...args, z: args.zRows - 2 }),
+  };
+}
+
+function frontBackEdgeAlignmentForZ({
+  params,
+  x,
+  y,
+  xRows,
+  yRows,
+  zRows,
+  z,
+  audioDepth,
+  sidePulse,
+  topBottomPulse,
+  spectrum,
+  nyquist,
+  amount,
+  radius,
+}: FrontBackEdgeAlignmentArgs & { z: number }) {
+  const topWeight = edgeSideWeight(y, yRows, 'min', radius);
+  const bottomWeight = edgeSideWeight(y, yRows, 'max', radius);
+  const leftWeight = edgeSideWeight(x, xRows, 'min', radius);
+  const rightWeight = edgeSideWeight(x, xRows, 'max', radius);
+
+  const topOffset = wallEnabled(params, 'top')
+    ? wallEdgeOffset(
+        params.topFormula ?? 'new',
+        'positive',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const bottomOffset = wallEnabled(params, 'bottom')
+    ? wallEdgeOffset(
+        params.bottomFormula ?? 'new',
+        'negative',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const leftOffset = wallEnabled(params, 'left')
+    ? wallEdgeOffset(
+        params.leftFormula ?? 'new',
+        'negative',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const rightOffset = wallEnabled(params, 'right')
+    ? wallEdgeOffset(
+        params.rightFormula ?? 'new',
+        'positive',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+
+  return {
+    x: (leftOffset * leftWeight + rightOffset * rightWeight) * amount,
+    y: (topOffset * topWeight + bottomOffset * bottomWeight) * amount,
+  };
+}
+
+function wallEdgeOffset(
+  formula: SketchParams[string],
+  direction: 'negative' | 'positive',
+  anim: number,
+) {
+  if (formula !== 'new') return 0;
+  return (direction === 'positive' ? 1 : -1) * (anim / 2);
+}
+
+function frontBackWallEdgeOffset(
+  formula: SketchParams[string],
+  direction: 'negative' | 'positive',
+  anim: number,
+) {
+  if (formula !== 'new') return 0;
+  return (direction === 'positive' ? 1 : -1) * (anim * 1.5);
+}
+
+function frontBackWallAnim(
+  x: number,
+  y: number,
+  xRows: number,
+  yRows: number,
+  audioDepth: number,
+  frontBackPulse: number,
+  spectrum: number[],
+  nyquist: number,
+) {
+  const falloff = sineFalloff(x, xRows) * sineFalloff(y, yRows);
+  const spectralEnergy = spectrumValueHz(
+    spectrum,
+    nyquist,
+    serpentinePosition(x, xRows, y, yRows),
+    2500,
+    12000,
+  );
+  const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
+
+  return falloff * energy * audioDepth;
+}
+
+function topBottomWallAnim(
+  x: number,
+  z: number,
+  xRows: number,
+  zRows: number,
+  audioDepth: number,
+  topBottomPulse: number,
+  spectrum: number[],
+  nyquist: number,
+) {
+  const falloff = sineFalloff(x, xRows) * sineFalloff(z, zRows);
+  const spectralEnergy = spectrumValueHz(
+    spectrum,
+    nyquist,
+    serpentinePosition(x, xRows, z, zRows),
+    260,
+    2500,
+  );
+  const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
+
+  return falloff * energy * audioDepth;
+}
+
+function sideWallAnim(
+  y: number,
+  z: number,
+  yRows: number,
+  zRows: number,
+  audioDepth: number,
+  sidePulse: number,
+  spectrum: number[],
+  nyquist: number,
+) {
+  const falloff = sineFalloff(y, yRows) * sineFalloff(z, zRows);
+  const spectralEnergy = spectrumValueHz(
+    spectrum,
+    nyquist,
+    serpentinePosition(z, zRows, y, yRows),
+    35,
+    260,
+  );
+  const energy = spectralEnergy * 1.25 + sidePulse * 0.15;
+
+  return falloff * energy * audioDepth;
+}
+
 function drawLeftRightWalls({
   p,
   params,
   routedParams,
+  xRows,
   yRows,
   zRows,
   xSize,
@@ -697,12 +1288,22 @@ function drawLeftRightWalls({
   totalDepth,
   audioDepth,
   sidePulse,
+  topBottomPulse,
+  frontBackPulse,
   spectrum,
   nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
     routedNumber(params, routedParams, 'Crazy_z_position', 0) / 100;
+  const edgeAlignEnabled = boolParam(params, 'leftRightEdgeAlign', false);
+  const edgeAlignAmount = clamp01(
+    routedNumber(params, routedParams, 'leftRightEdgeAlignAmount', 0.8),
+  );
+  const edgeAlignRadius = Math.max(
+    0.05,
+    routedNumber(params, routedParams, 'leftRightEdgeAlignRadius', 0.75),
+  );
 
   for (let y = 1; y < yRows - 1; y += 1) {
     const falloffY = sineFalloff(y, yRows);
@@ -721,14 +1322,37 @@ function drawLeftRightWalls({
       const py = totalHeight / 2 - y * stepY - stepY / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
+      const leftMethod = params.leftFormula ?? 'new';
+      const rightMethod = params.rightFormula ?? 'new';
+      const edgeAlign = edgeAlignEnabled
+        ? leftRightEdgeAlignment({
+            params,
+            xRows,
+            y,
+            z,
+            yRows,
+            zRows,
+            audioDepth,
+            topBottomPulse,
+            frontBackPulse,
+            spectrum,
+            nyquist,
+            amount: edgeAlignAmount,
+            radius: edgeAlignRadius,
+          })
+        : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
+        const px =
+          leftMethod === 'old'
+            ? -totalWidth / 2 + stepX / 2 - anim / 2
+            : -totalWidth / 2 - anim + stepX * 2 - (stepX + stepX / 2);
+
         drawBox(
           p,
-          // -totalWidth / 2 + stepX / 2 - anim / 2, (old way)
-          -totalWidth / 2 - anim + stepX * 2,
-          py,
-          warpedZ,
+          px,
+          py + edgeAlign.left.y,
+          warpedZ + edgeAlign.left.z,
           xSize + anim,
           ySize,
           zSize,
@@ -737,12 +1361,16 @@ function drawLeftRightWalls({
       }
 
       if (wallEnabled(params, 'right')) {
+        const px =
+          rightMethod === 'old'
+            ? totalWidth / 2 - stepX / 2 + anim / 2
+            : totalWidth / 2 + anim - stepX * 2 + (stepX + stepX / 2);
+
         drawBox(
           p,
-          // totalWidth / 2 - stepX / 2 + anim / 2(old wAY),
-          totalWidth / 2 + anim - stepX * 2,
-          py,
-          warpedZ,
+          px,
+          py + edgeAlign.right.y,
+          warpedZ + edgeAlign.right.z,
           xSize + anim,
           ySize,
           zSize,
@@ -753,11 +1381,127 @@ function drawLeftRightWalls({
   }
 }
 
+type LeftRightEdgeAlignmentArgs = {
+  params: SketchParams;
+  xRows: number;
+  y: number;
+  z: number;
+  yRows: number;
+  zRows: number;
+  audioDepth: number;
+  topBottomPulse: number;
+  frontBackPulse: number;
+  spectrum: number[];
+  nyquist: number;
+  amount: number;
+  radius: number;
+};
+
+function leftRightEdgeAlignment(args: LeftRightEdgeAlignmentArgs) {
+  return {
+    left: leftRightEdgeAlignmentForX({ ...args, x: 1 }),
+    right: leftRightEdgeAlignmentForX({ ...args, x: args.xRows - 2 }),
+  };
+}
+
+function leftRightEdgeAlignmentForX({
+  params,
+  x,
+  y,
+  z,
+  xRows,
+  yRows,
+  zRows,
+  audioDepth,
+  topBottomPulse,
+  frontBackPulse,
+  spectrum,
+  nyquist,
+  amount,
+  radius,
+}: LeftRightEdgeAlignmentArgs & { x: number }) {
+  const topWeight = edgeSideWeight(y, yRows, 'min', radius);
+  const bottomWeight = edgeSideWeight(y, yRows, 'max', radius);
+  const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
+  const backWeight = edgeSideWeight(z, zRows, 'max', radius);
+
+  const topOffset = wallEnabled(params, 'top')
+    ? wallEdgeOffset(
+        params.topFormula ?? 'new',
+        'positive',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const bottomOffset = wallEnabled(params, 'bottom')
+    ? wallEdgeOffset(
+        params.bottomFormula ?? 'new',
+        'negative',
+        topBottomWallAnim(
+          x,
+          z,
+          xRows,
+          zRows,
+          audioDepth,
+          topBottomPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const frontOffset = wallEnabled(params, 'front')
+    ? frontBackWallEdgeOffset(
+        params.frontFormula ?? 'new',
+        'negative',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const backOffset = wallEnabled(params, 'back')
+    ? frontBackWallEdgeOffset(
+        params.backFormula ?? 'new',
+        'positive',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+
+  return {
+    y: (topOffset * topWeight + bottomOffset * bottomWeight) * amount,
+    z: (frontOffset * frontWeight + backOffset * backWeight) * amount,
+  };
+}
+
 function drawTopBottomWalls({
   p,
   params,
   routedParams,
   xRows,
+  yRows,
   zRows,
   xSize,
   ySize,
@@ -769,13 +1513,23 @@ function drawTopBottomWalls({
   totalHeight,
   totalDepth,
   audioDepth,
+  sidePulse,
   topBottomPulse,
+  frontBackPulse,
   spectrum,
   nyquist,
   timeMs,
 }: DrawWallsArgs) {
   const crazyZ =
     routedNumber(params, routedParams, 'Crazy_z_position', 0) / 100;
+  const edgeAlignEnabled = boolParam(params, 'topBottomEdgeAlign', false);
+  const edgeAlignAmount = clamp01(
+    routedNumber(params, routedParams, 'topBottomEdgeAlignAmount', 0.8),
+  );
+  const edgeAlignRadius = Math.max(
+    0.05,
+    routedNumber(params, routedParams, 'topBottomEdgeAlignRadius', 0.75),
+  );
 
   for (let x = 1; x < xRows - 1; x += 1) {
     const falloffX = sineFalloff(x, xRows);
@@ -794,14 +1548,37 @@ function drawTopBottomWalls({
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
+      const topMethod = params.topFormula ?? 'new';
+      const bottomMethod = params.bottomFormula ?? 'new';
+      const edgeAlign = edgeAlignEnabled
+        ? topBottomEdgeAlignment({
+            params,
+            x,
+            z,
+            xRows,
+            yRows,
+            zRows,
+            audioDepth,
+            sidePulse,
+            frontBackPulse,
+            spectrum,
+            nyquist,
+            amount: edgeAlignAmount,
+            radius: edgeAlignRadius,
+          })
+        : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
+        const py =
+          topMethod === 'old'
+            ? totalHeight / 2 - stepY / 2 + anim / 2
+            : totalHeight / 2 - stepY * 2 + anim + (stepY + stepY / 2);
+
         drawBox(
           p,
-          px,
-          //totalHeight / 2 - stepY / 2 + anim / 2,
-          totalHeight / 2 - stepY * 2 + anim,
-          warpedZ,
+          px + edgeAlign.top.x,
+          py,
+          warpedZ + edgeAlign.top.z,
           xSize,
           ySize + anim,
           zSize,
@@ -810,12 +1587,16 @@ function drawTopBottomWalls({
       }
 
       if (wallEnabled(params, 'bottom')) {
+        const py =
+          bottomMethod === 'old'
+            ? -totalHeight / 2 + stepY / 2 - anim / 2
+            : -totalHeight / 2 + stepY * 2 - anim - (stepY + stepY / 2);
+
         drawBox(
           p,
-          px,
-          // -totalHeight / 2 + stepY / 2 - anim / 2,
-          -totalHeight / 2 + stepY * 2 - anim,
-          warpedZ,
+          px + edgeAlign.bottom.x,
+          py,
+          warpedZ + edgeAlign.bottom.z,
           xSize,
           ySize + anim,
           zSize,
@@ -824,4 +1605,119 @@ function drawTopBottomWalls({
       }
     }
   }
+}
+
+type TopBottomEdgeAlignmentArgs = {
+  params: SketchParams;
+  x: number;
+  z: number;
+  xRows: number;
+  yRows: number;
+  zRows: number;
+  audioDepth: number;
+  sidePulse: number;
+  frontBackPulse: number;
+  spectrum: number[];
+  nyquist: number;
+  amount: number;
+  radius: number;
+};
+
+function topBottomEdgeAlignment(args: TopBottomEdgeAlignmentArgs) {
+  return {
+    top: topBottomEdgeAlignmentForY({ ...args, y: 1 }),
+    bottom: topBottomEdgeAlignmentForY({ ...args, y: args.yRows - 2 }),
+  };
+}
+
+function topBottomEdgeAlignmentForY({
+  params,
+  x,
+  y,
+  z,
+  xRows,
+  yRows,
+  zRows,
+  audioDepth,
+  sidePulse,
+  frontBackPulse,
+  spectrum,
+  nyquist,
+  amount,
+  radius,
+}: TopBottomEdgeAlignmentArgs & { y: number }) {
+  const leftWeight = edgeSideWeight(x, xRows, 'min', radius);
+  const rightWeight = edgeSideWeight(x, xRows, 'max', radius);
+  const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
+  const backWeight = edgeSideWeight(z, zRows, 'max', radius);
+
+  const leftOffset = wallEnabled(params, 'left')
+    ? wallEdgeOffset(
+        params.leftFormula ?? 'new',
+        'negative',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const rightOffset = wallEnabled(params, 'right')
+    ? wallEdgeOffset(
+        params.rightFormula ?? 'new',
+        'positive',
+        sideWallAnim(
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const frontOffset = wallEnabled(params, 'front')
+    ? frontBackWallEdgeOffset(
+        params.frontFormula ?? 'new',
+        'negative',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+  const backOffset = wallEnabled(params, 'back')
+    ? frontBackWallEdgeOffset(
+        params.backFormula ?? 'new',
+        'positive',
+        frontBackWallAnim(
+          x,
+          y,
+          xRows,
+          yRows,
+          audioDepth,
+          frontBackPulse,
+          spectrum,
+          nyquist,
+        ),
+      )
+    : 0;
+
+  return {
+    x: (leftOffset * leftWeight + rightOffset * rightWeight) * amount,
+    z: (frontOffset * frontWeight + backOffset * backWeight) * amount,
+  };
 }

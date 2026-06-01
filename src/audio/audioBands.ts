@@ -24,12 +24,15 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   lastKickTime: 0,
   kickEnergy: 0,
   nyquist: 22050,
+  fps: 0,
   dataArray: [],
 };
 
 export function inferConfigControls(config: AnalyzerConfig) {
   return Object.entries(config).map(([key, value]) => {
-    const isMs = key.toLowerCase().includes('interval') || key.toLowerCase().includes('time');
+    const isMs =
+      key.toLowerCase().includes('interval') ||
+      key.toLowerCase().includes('time');
     const isThreshold = key.toLowerCase().includes('threshold');
     const isDecay = key.toLowerCase().includes('decay');
 
@@ -49,6 +52,7 @@ export function processAudioBands(
   sampleRate: number,
   currentBands: Partial<ReactiveSignals> = EMPTY_SIGNALS,
   customConfig: Partial<typeof DEFAULT_AUDIO_BAND_CONFIG> = {},
+  fps: number = 0,
 ): ReactiveSignals {
   const config = { ...DEFAULT_AUDIO_BAND_CONFIG, ...customConfig };
   const normalizedDataArray = new Array<number>(dataArray.length).fill(0);
@@ -71,7 +75,9 @@ export function processAudioBands(
     const freq = (i * maxFreq) / len;
     const rawValue = dataArray[i] ?? 0;
     const currentThreshold =
-      freq < 250 ? Math.floor(config.noiseThreshold * 0.5) : config.noiseThreshold;
+      freq < 250
+        ? Math.floor(config.noiseThreshold * 0.5)
+        : config.noiseThreshold;
     const denominator = 255 - currentThreshold;
     const v =
       rawValue > currentThreshold && denominator > 0
@@ -116,7 +122,10 @@ export function processAudioBands(
 
   let dynamicBass = rawBass;
   if (smoothKick > config.sidechainThreshold) {
-    dynamicBass = Math.max(0, dynamicBass - smoothKick * config.sidechainDuckFactor);
+    dynamicBass = Math.max(
+      0,
+      dynamicBass - smoothKick * config.sidechainDuckFactor,
+    );
   }
 
   const now = performance.now();
@@ -129,13 +138,16 @@ export function processAudioBands(
   let detectedKick = 0;
   let newLastKickTime = lastKickTime;
 
-  if (kickEnergy > config.kickThreshold && timeSinceLastKick > config.kickMinInterval) {
+  if (
+    kickEnergy > config.kickThreshold &&
+    timeSinceLastKick > config.kickMinInterval
+  ) {
     detectedKick = kickEnergy;
     newLastKickTime = now;
   }
 
   return {
-    z,
+    detectedKick,
     kick: kickDelta,
     bassWithoutKick: Math.max(0, rawBass - kickDelta * 1.5),
     cleanedBass: Math.max(0, rawBass - rawKick),
@@ -145,6 +157,7 @@ export function processAudioBands(
     lastKickTime: newLastKickTime,
     kickEnergy,
     nyquist: maxFreq,
+    fps,
     dataArray: normalizedDataArray,
   };
 }

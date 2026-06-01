@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioEngine } from './audio/AudioEngine';
 import { EMPTY_SIGNALS } from './audio/audioBands';
 import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
-import { applyRouting, createRoute } from './routing/routing';
 import { sketches } from './sketches/registry';
 import { AnalyzerPanel } from './ui/AnalyzerPanel';
 import { ParameterControls } from './ui/ParameterControls';
-import { RoutingMatrix } from './ui/RoutingMatrix';
+import { SignalRouter } from './ui/SignalRouter';
+import { SignalRouterUI } from './ui/SignalRouterUI';
 import { Transport } from './ui/Transport';
+import { SourceNode } from './ui/SourceNode';
+import { TargetNode } from './ui/TargetNode';
+import { PipelineEditor } from './ui/PipelineEditor';
 import type {
   NumericRecord,
   ReactiveSignals,
-  RouteMapping,
   SketchParams,
   SketchParamValue,
 } from './core/types';
@@ -37,79 +39,8 @@ function defaultParamsForSketch(sketchId: string): SketchParams {
   );
 }
 
-function defaultRoutesForSketch(sketchId: string): RouteMapping[] {
-  if (sketchId === 'dupa') {
-    return [
-      {
-        ...createRoute('cleanedBass', 'X_GAP'),
-        amount: 1,
-        min: 0,
-        max: 55,
-        processor: 'envelope',
-        smoothing: 0.45,
-      },
-      {
-        ...createRoute('bass', 'audioDepth'),
-        amount: 1,
-        min: 0,
-        max: 320,
-        smoothing: 0.25,
-      },
-    ];
-  }
-
-  if (sketchId === 'particle-tunnel') {
-    return [
-      {
-        ...createRoute('kickEnergy', 'particleSpeed'),
-        amount: 1.2,
-        min: 0,
-        max: 8,
-        smoothing: 0.35,
-      },
-      {
-        ...createRoute('cc74', 'hue'),
-        amount: 1,
-        min: 0,
-        max: 360,
-        smoothing: 0.18,
-      },
-    ];
-  }
-
-  return [
-    {
-      ...createRoute('bass', 'wallAmplitude'),
-      amount: 1.4,
-      min: 0,
-      max: 180,
-      smoothing: 0.18,
-    },
-    {
-      ...createRoute('high', 'hue'),
-      amount: 1,
-      min: 0,
-      max: 180,
-      smoothing: 0.2,
-    },
-  ];
-}
-
-function createRouteForTarget(
-  source: string,
-  target: string,
-  sketchId: string,
-): RouteMapping {
-  const route = createRoute(source, target);
-  const sketch = sketches.find((item) => item.id === sketchId) ?? sketches[0];
-  const definition = sketch.params.find((param) => param.key === target);
-
-  if (definition?.type === 'number') {
-    route.min = 0;
-    route.max = Math.max(definition.step, definition.max - definition.min);
-  }
-
-  return route;
+function wrapDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
 }
 
 export function App() {
@@ -127,13 +58,46 @@ export function App() {
   const [signals, setSignals] = useState<ReactiveSignals>({ ...EMPTY_SIGNALS });
   const [midi, setMidi] = useState<NumericRecord>({});
   const [routedParams, setRoutedParams] = useState<NumericRecord>({});
-  const [routes, setRoutes] = useState<RouteMapping[]>(() =>
-    defaultRoutesForSketch(selectedSketchId),
-  );
+
+  const [signalRouters, setSignalRouters] = useState<SignalRouter[]>(() => {
+    const router = new SignalRouter();
+    const src = new SourceNode('anchor-source', 'bass');
+    const tgt = new TargetNode('anchor-target', 'audioDepth');
+    router.addNode(src);
+    router.addNode(tgt);
+    return [router];
+  });
+
+  const addSignalRouter = () => {
+    const router = new SignalRouter();
+    const trackId = crypto.randomUUID().slice(0, 8);
+    router.addNode(
+      new SourceNode(`anchor-source-${trackId}`, sourceKeys[0] || 'bass'),
+    );
+    router.addNode(
+      new TargetNode(`anchor-target-${trackId}`, targetKeys[0] || 'audioDepth'),
+    );
+    setSignalRouters((prev) => [...prev, router]);
+    setRouterVersion((v) => v + 1);
+  };
+
+  const removeSignalRouter = (index: number) => {
+    if (signalRouters.length <= 1) return;
+    const next = [...signalRouters];
+    next.splice(index, 1);
+    setSignalRouters(next);
+    setRouterVersion((v) => v + 1);
+  };
+
+  const [, setRouterVersion] = useState(0);
+  const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
   const midiRef = useRef(new MidiManager());
-  const routedRef = useRef<NumericRecord>({});
+  const fpsRef = useRef({
+    frames: 0,
+    lastSample: performance.now(),
+  });
   const runtimeRef = useRef<P5RuntimeState>({
     params: initialParams,
     routedParams: {},
@@ -145,8 +109,6 @@ export function App() {
     const nextParams = defaultParamsForSketch(selectedSketchId);
     setParams(nextParams);
     setRoutedParams({});
-    setRoutes(defaultRoutesForSketch(selectedSketchId));
-    routedRef.current = {};
     runtimeRef.current = {
       ...runtimeRef.current,
       params: nextParams,
@@ -168,13 +130,25 @@ export function App() {
       const nextSignals = audioRef.current.update();
       const nextMidi = midiRef.current.currentValues;
       const sources = { ...numericSignals(nextSignals), ...nextMidi };
-      const nextRouted = applyRouting(
-        runtimeRef.current.params,
-        routes,
-        sources,
-        routedRef.current,
-      );
-      routedRef.current = nextRouted;
+      const nextRouted: NumericRecord = {};
+
+      // Przetwarzanie wszystkich grafów sygnałów
+      for (const router of signalRouters) {
+        router.update(sources);
+
+        // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
+        const currentNodes = router.getNodes();
+        for (const node of currentNodes) {
+          if (node instanceof TargetNode) {
+            const val = node.inputs.in.value;
+            if (typeof val === 'number') {
+              nextRouted[node.targetParam] =
+                (nextRouted[node.targetParam] ?? 0) + val;
+            }
+          }
+        }
+      }
+
       runtimeRef.current = {
         params: runtimeRef.current.params,
         signals: nextSignals,
@@ -183,6 +157,17 @@ export function App() {
       };
 
       const now = performance.now();
+      fpsRef.current.frames += 1;
+      if (now - fpsRef.current.lastSample >= 500) {
+        setFps(
+          (fpsRef.current.frames * 1000) / (now - fpsRef.current.lastSample),
+        );
+        fpsRef.current = {
+          frames: 0,
+          lastSample: now,
+        };
+      }
+
       if (now - lastUiUpdate > 50) {
         setSignals(nextSignals);
         setMidi(nextMidi);
@@ -195,14 +180,14 @@ export function App() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [params, routes]);
+  }, [params, signalRouters]);
 
   useEffect(() => () => audioRef.current.dispose(), []);
 
-  const routeSourceValues = useMemo(
-    () => ({ ...numericSignals(signals), ...midi }),
-    [signals, midi],
-  );
+  const handleConfigChange = useCallback((key: string, value: number) => {
+    audioRef.current.setConfigValue(key, value);
+    setAudioVersion((version) => version + 1);
+  }, []);
 
   const sourceKeys = useMemo(() => {
     const signalKeys = Object.keys(numericSignals(signals)).sort();
@@ -219,6 +204,12 @@ export function App() {
         .map((param) => param.key),
     [selectedSketch],
   );
+  const supportsDragRotate = useMemo(
+    () =>
+      selectedSketch.params.some((param) => param.key === 'X_ROTATE') &&
+      selectedSketch.params.some((param) => param.key === 'Y_ROTATE'),
+    [selectedSketch],
+  );
 
   return (
     <main className="appShell">
@@ -226,6 +217,29 @@ export function App() {
         key={selectedSketch.id}
         sketch={selectedSketch}
         runtimeRef={runtimeRef}
+        onRotateDrag={
+          supportsDragRotate
+            ? (deltaX, deltaY) => {
+                const sensitivity = 0.35;
+                setParams((current) => ({
+                  ...current,
+                  X_ROTATE: wrapDegrees(
+                    Number(current.X_ROTATE ?? 0) + deltaY * sensitivity,
+                  ),
+                  Y_ROTATE: wrapDegrees(
+                    Number(current.Y_ROTATE ?? 0) + deltaX * sensitivity,
+                  ),
+                }));
+              }
+            : undefined
+        }
+      />
+
+      <AnalyzerPanel
+        config={audioRef.current.config}
+        signals={signals}
+        fps={fps}
+        onConfigChange={handleConfigChange}
       />
 
       <aside className="sidebar">
@@ -264,16 +278,6 @@ export function App() {
           }}
         />
 
-        <AnalyzerPanel
-          key={audioVersion}
-          config={audioRef.current.config}
-          signals={signals}
-          onConfigChange={(key, value) => {
-            audioRef.current.setConfigValue(key, value);
-            setAudioVersion((version) => version + 1);
-          }}
-        />
-
         <ParameterControls
           sketch={selectedSketch}
           params={params}
@@ -282,32 +286,16 @@ export function App() {
             setParams((current) => ({ ...current, [key]: value }));
           }}
         />
-
-        <RoutingMatrix
-          routes={routes}
-          sourceKeys={sourceKeys}
-          sourceValues={routeSourceValues}
-          targetKeys={targetKeys}
-          onAdd={() =>
-            setRoutes((current) => [
-              ...current,
-              createRouteForTarget(
-                sourceKeys[0],
-                targetKeys[0],
-                selectedSketchId,
-              ),
-            ])
-          }
-          onChange={(route) =>
-            setRoutes((current) =>
-              current.map((item) => (item.id === route.id ? route : item)),
-            )
-          }
-          onRemove={(id) =>
-            setRoutes((current) => current.filter((route) => route.id !== id))
-          }
-        />
       </aside>
+
+      <PipelineEditor
+        routers={signalRouters}
+        sourceKeys={sourceKeys}
+        targetKeys={targetKeys}
+        onUpdate={() => setRouterVersion((v) => v + 1)}
+        onAddRoute={addSignalRouter}
+        onRemoveRoute={removeSignalRouter}
+      />
     </main>
   );
 }
