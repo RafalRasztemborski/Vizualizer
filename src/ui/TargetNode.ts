@@ -8,6 +8,7 @@ export class TargetNode implements INode {
   outputs: Record<string, IPort> = {};
 
   targetParam: string;
+  enabled: boolean = true;
 
   constructor(id: string, targetParam: string) {
     this.id = id;

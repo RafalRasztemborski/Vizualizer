@@ -11,6 +11,7 @@ export class SignalStrengthenerProNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   // --- Parametry Konfiguracyjne ---
   mode: StrengthenerMode = StrengthenerMode.POWER;
@@ -65,7 +66,9 @@ export class SignalStrengthenerProNode implements INode {
 
     let n: number; // Znormalizowany wynik [0, 1]
 
-    if (this.mode === StrengthenerMode.POWER) {
+    if (this.enabled === false) {
+      n = t; // W trybie bypass przekazujemy surowy sygnał wejściowy do dalszej obróbki
+    } else if (this.mode === StrengthenerMode.POWER) {
       // --- Tryb 1: Funkcja potęgowa ---
       n = Math.pow(t, this.p);
     } else {

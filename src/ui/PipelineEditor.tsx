@@ -405,13 +405,45 @@ const PipelineNodeCard = React.memo<{
     const inputVal = Object.values(node.inputs)[0]?.value ?? 0;
     const outputVal = Object.values(node.outputs)[0]?.value ?? inputVal;
     const isPro = node.name.includes('PRO') || node.id.includes('pro');
+    const isEnabled = (node as any).enabled !== false;
 
     const isAnchor = node.id.startsWith('anchor');
 
     return (
       <div
-        className={`pipeline-card type-${node.type} ${isAnchor ? 'is-anchor' : ''}`}
+        className={`pipeline-card type-${node.type} ${isAnchor ? 'is-anchor' : ''} ${!isEnabled ? 'is-bypassed' : ''}`}
+        style={{
+          position: 'relative',
+          opacity: isEnabled ? 1 : 0.7,
+          transition: 'opacity 0.2s',
+        }}
       >
+        {!isAnchor && (
+          <button
+            onClick={() => {
+              (node as any).enabled = !isEnabled;
+              onUpdate();
+            }}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: isEnabled ? '#28c840' : '#ff5f57',
+              border: isEnabled ? '1px solid #1aab29' : '1px solid #e0443e',
+              cursor: 'pointer',
+              zIndex: 100,
+              padding: 0,
+            }}
+            title={
+              isEnabled
+                ? 'Node Active - Click to bypass'
+                : 'Node Bypassed - Click to enable'
+            }
+          />
+        )}
         <div className="node-title-area">
           <div
             className="node-title-header"

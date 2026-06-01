@@ -6,6 +6,7 @@ export class ClampNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   min: number = 0;
   max: number = 1;
@@ -34,6 +35,11 @@ export class ClampNode implements INode {
 
   process() {
     const val = this.inputs.in.value;
+    if (this.enabled === false) {
+      this.outputs.out.value = val;
+      return;
+    }
+
     // Ograniczenie wartości do zakresu [min, max]
     this.outputs.out.value = Math.max(this.min, Math.min(this.max, val));
   }

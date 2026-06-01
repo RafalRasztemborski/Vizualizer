@@ -6,6 +6,7 @@ export class SignalStrengthNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   multiplier: number = 10;
   offset: number = 0;
@@ -33,6 +34,11 @@ export class SignalStrengthNode implements INode {
   }
 
   process() {
+    if (this.enabled === false) {
+      this.outputs.out.value = this.inputs.in.value;
+      return;
+    }
+
     this.outputs.out.value =
       (this.inputs.in.value - this.offset) * this.multiplier;
   }

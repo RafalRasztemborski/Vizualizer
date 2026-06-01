@@ -6,6 +6,7 @@ export class CurveNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   mode: 'power' | 'log' = 'power';
   exponent: number = 1.5;
@@ -35,6 +36,11 @@ export class CurveNode implements INode {
 
   process() {
     const x = Math.max(0, this.inputs.in.value);
+    if (this.enabled === false) {
+      this.outputs.out.value = x;
+      return;
+    }
+
     let result = x;
 
     if (this.mode === 'power') {

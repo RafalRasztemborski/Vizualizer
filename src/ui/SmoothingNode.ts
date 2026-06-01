@@ -6,6 +6,7 @@ export class SmoothingNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   // Parametry regulowane przez suwaki w UI
   factor: number = 0.1;
@@ -34,6 +35,12 @@ export class SmoothingNode implements INode {
 
   process(state: { current?: number }) {
     const target = this.inputs.in.value;
+
+    if (this.enabled === false) {
+      state.current = target;
+      this.outputs.out.value = target;
+      return;
+    }
 
     // Inicjalizacja stanu wewnętrznego noda (pamięć między klatkami)
     if (state.current === undefined) state.current = target;

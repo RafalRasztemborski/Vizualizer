@@ -6,6 +6,7 @@ export class RemapNode implements INode {
   type = 'processor';
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  enabled: boolean = true;
 
   inMin: number = 0.65;
   inMax: number = 0.75;
@@ -36,6 +37,11 @@ export class RemapNode implements INode {
 
   process() {
     const val = this.inputs.in.value;
+    if (this.enabled === false) {
+      this.outputs.out.value = val;
+      return;
+    }
+
 
     // Formuła Remap:
     // t = (val - inMin) / (inMax - inMin)
