@@ -977,10 +977,11 @@ function drawFrontBackWalls({
   );
 
   for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x, xRows);
+    const falloffX = sineFalloff(x - 1, xRows - 2);
 
     for (let y = 1; y < yRows - 1; y += 1) {
-      const falloff = falloffX * sineFalloff(y, yRows);
+      const falloffY = sineFalloff(y - 1, yRows - 2);
+      const falloff = (falloffX + falloffY) / 2; // Średnia, aby tylko rogi (0,0) były nieruchome
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1076,6 +1077,7 @@ function frontBackEdgeAlignment(args: FrontBackEdgeAlignmentArgs) {
 
 function frontBackEdgeAlignmentForZ({
   params,
+  routedParams,
   x,
   y,
   xRows,
@@ -1197,7 +1199,9 @@ function frontBackWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(x, xRows) * sineFalloff(y, yRows);
+  const fx = sineFalloff(x - 1, xRows - 2);
+  const fy = sineFalloff(y - 1, yRows - 2);
+  const falloff = (fx + fy) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1220,7 +1224,9 @@ function topBottomWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(x, xRows) * sineFalloff(z, zRows);
+  const fx = sineFalloff(x - 1, xRows - 2);
+  const fz = sineFalloff(z - 1, zRows - 2);
+  const falloff = (fx + fz) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1243,7 +1249,9 @@ function sideWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(y, yRows) * sineFalloff(z, zRows);
+  const fy = sineFalloff(y - 1, yRows - 2);
+  const fz = sineFalloff(z - 1, zRows - 2);
+  const falloff = (fy + fz) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1292,10 +1300,12 @@ function drawLeftRightWalls({
   );
 
   for (let y = 1; y < yRows - 1; y += 1) {
-    const falloffY = sineFalloff(y, yRows);
+    const falloffY = sineFalloff(y - 1, yRows - 2);
 
     for (let z = 1; z < zRows - 1; z += 1) {
-      const falloff = falloffY * sineFalloff(z, zRows);
+      const falloffZ = sineFalloff(z - 1, zRows - 2);
+      const falloff = (falloffY + falloffZ) / 2;
+
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1393,6 +1403,7 @@ function leftRightEdgeAlignment(args: LeftRightEdgeAlignmentArgs) {
 
 function leftRightEdgeAlignmentForX({
   params,
+  routedParams,
   x,
   y,
   z,
@@ -1532,10 +1543,12 @@ function drawTopBottomWalls({
   );
 
   for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x, xRows);
+    const falloffX = sineFalloff(x - 1, xRows - 2);
 
     for (let z = 1; z < zRows - 1; z += 1) {
-      const falloff = falloffX * sineFalloff(z, zRows);
+      const falloffZ = sineFalloff(z - 1, zRows - 2);
+      const falloff = (falloffX + falloffZ) / 2;
+
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1633,6 +1646,7 @@ function topBottomEdgeAlignment(args: TopBottomEdgeAlignmentArgs) {
 
 function topBottomEdgeAlignmentForY({
   params,
+  routedParams,
   x,
   y,
   z,
