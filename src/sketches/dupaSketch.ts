@@ -705,48 +705,78 @@ export const dupaSketch: P5SketchModule = {
       step: 0.01,
       defaultValue: 0.75,
     },
+    // --- SEKCJA 7: ARCH STRENGTH (FORMUŁY) ---
     {
-      key: 'frontFormula',
-      label: 'Front formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
+      key: 'frontBackArch',
+      label: 'F/B Arch Strength',
+      type: 'number',
+      min: -4,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1.5,
     },
     {
-      key: 'backFormula',
-      label: 'Back formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
-    },
-    // --- SEKCJA 7: FORMUŁY MATEMATYCZNE ---
-    {
-      key: 'leftFormula',
-      label: 'Left formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
+      key: 'frontBackWallPower',
+      label: 'F/B Wall Power',
+      type: 'number',
+      min: 0,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1,
     },
     {
-      key: 'rightFormula',
-      label: 'Right formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
+      key: 'leftRightArch',
+      label: 'L/R Arch Strength',
+      type: 'number',
+      min: -4,
+      max: 4,
+      step: 0.01,
+      defaultValue: 0.5,
     },
     {
-      key: 'topFormula',
-      label: 'Top formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
+      key: 'leftRightWallPower',
+      label: 'L/R Wall Power',
+      type: 'number',
+      min: 0,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1,
     },
     {
-      key: 'bottomFormula',
-      label: 'Bottom formula',
-      type: 'select',
-      options: ['old', 'new'],
-      defaultValue: 'new',
+      key: 'topBottomArch',
+      label: 'T/B Arch Strength',
+      type: 'number',
+      min: -4,
+      max: 4,
+      step: 0.01,
+      defaultValue: 0.5,
+    },
+    {
+      key: 'topBottomWallPower',
+      label: 'T/B Wall Power',
+      type: 'number',
+      min: 0,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1,
+    },
+    {
+      key: 'sinDensity',
+      label: 'Arch Sin Density',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.01,
+      defaultValue: 0,
+    },
+    {
+      key: 'sinPhase',
+      label: 'Arch Sin Phase',
+      type: 'number',
+      min: -3.14,
+      max: 3.14,
+      step: 0.01,
+      defaultValue: 0,
     },
   ],
   setup(p) {
@@ -992,10 +1022,11 @@ function drawFrontBackWalls({
   );
 
   for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x, xRows);
+    const falloffX = sineFalloff(x - 1, xRows - 2);
 
     for (let y = 1; y < yRows - 1; y += 1) {
-      const falloff = falloffX * sineFalloff(y, yRows);
+      const falloffY = sineFalloff(y - 1, yRows - 2);
+      const falloff = (falloffX + falloffY) / 2; // Średnia, aby tylko rogi (0,0) były nieruchome
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1007,8 +1038,25 @@ function drawFrontBackWalls({
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
-      const frontMethod = params.frontFormula ?? 'new';
-      const backMethod = params.backFormula ?? 'new';
+      const archStrength = archStrengthWithSine(
+        params,
+        routedParams,
+        'frontBackArch',
+        1.5,
+        serpentinePosition(x, xRows, y, yRows),
+      );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'frontBackWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffX * falloffY,
+        stepZ,
+      );
       const edgeAlign = edgeAlignEnabled
         ? frontBackEdgeAlignment({
             params,
@@ -1029,10 +1077,7 @@ function drawFrontBackWalls({
         : { front: { x: 0, y: 0 }, back: { x: 0, y: 0 } };
 
       if (wallEnabled(params, 'front')) {
-        const pz =
-          frontMethod === 'old'
-            ? -totalDepth / 2 + stepZ / 2 - anim / 2
-            : -totalDepth / 2 + stepZ - anim * 2 - (stepZ - stepZ / 2);
+        const pz = -totalDepth / 2 + stepZ / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
@@ -1041,16 +1086,13 @@ function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + anim,
+          zSize + sizeAdd,
           colorForBox(params, routedParams, 'front', falloff, energy, timeMs),
         );
       }
 
       if (wallEnabled(params, 'back')) {
-        const pz =
-          backMethod === 'old'
-            ? totalDepth / 2 - stepZ / 2 + anim / 2
-            : totalDepth / 2 - stepZ + anim * 2 + (stepZ - stepZ / 2);
+        const pz = totalDepth / 2 - stepZ / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
@@ -1059,7 +1101,7 @@ function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + anim,
+          zSize + sizeAdd,
           colorForBox(params, routedParams, 'back', falloff, energy, timeMs),
         );
       }
@@ -1093,6 +1135,7 @@ function frontBackEdgeAlignment(args: FrontBackEdgeAlignmentArgs) {
 
 function frontBackEdgeAlignmentForZ({
   params,
+  routedParams,
   x,
   y,
   xRows,
@@ -1112,9 +1155,22 @@ function frontBackEdgeAlignmentForZ({
   const leftWeight = edgeSideWeight(x, xRows, 'min', radius);
   const rightWeight = edgeSideWeight(x, xRows, 'max', radius);
 
+  const topBottomStrength = routedNumber(
+    params,
+    routedParams,
+    'topBottomArch',
+    0.5,
+  );
+  const leftRightStrength = routedNumber(
+    params,
+    routedParams,
+    'leftRightArch',
+    0.5,
+  );
+
   const topOffset = wallEnabled(params, 'top')
     ? wallEdgeOffset(
-        params.topFormula ?? 'new',
+        topBottomStrength,
         'positive',
         topBottomWallAnim(
           x,
@@ -1130,7 +1186,7 @@ function frontBackEdgeAlignmentForZ({
     : 0;
   const bottomOffset = wallEnabled(params, 'bottom')
     ? wallEdgeOffset(
-        params.bottomFormula ?? 'new',
+        topBottomStrength,
         'negative',
         topBottomWallAnim(
           x,
@@ -1146,7 +1202,7 @@ function frontBackEdgeAlignmentForZ({
     : 0;
   const leftOffset = wallEnabled(params, 'left')
     ? wallEdgeOffset(
-        params.leftFormula ?? 'new',
+        leftRightStrength,
         'negative',
         sideWallAnim(
           y,
@@ -1162,7 +1218,7 @@ function frontBackEdgeAlignmentForZ({
     : 0;
   const rightOffset = wallEnabled(params, 'right')
     ? wallEdgeOffset(
-        params.rightFormula ?? 'new',
+        leftRightStrength,
         'positive',
         sideWallAnim(
           y,
@@ -1184,21 +1240,53 @@ function frontBackEdgeAlignmentForZ({
 }
 
 function wallEdgeOffset(
-  formula: SketchParams[string],
+  strength: number,
   direction: 'negative' | 'positive',
   anim: number,
 ) {
-  if (formula !== 'new') return 0;
-  return (direction === 'positive' ? 1 : -1) * (anim / 2);
+  return (
+    (direction === 'positive' ? 1 : -1) * anim * (0.5 + Math.max(0, strength))
+  );
 }
 
-function frontBackWallEdgeOffset(
-  formula: SketchParams[string],
-  direction: 'negative' | 'positive',
-  anim: number,
+function archStrengthWithSine(
+  params: SketchParams,
+  routedParams: NumericRecord,
+  key: string,
+  fallback: number,
+  position: number,
 ) {
-  if (formula !== 'new') return 0;
-  return (direction === 'positive' ? 1 : -1) * (anim * 1.5);
+  const baseStrength = routedNumber(params, routedParams, key, fallback);
+  const density = Math.max(
+    0,
+    routedNumber(params, routedParams, 'sinDensity', 0),
+  );
+  if (density <= 0) return baseStrength;
+
+  const phase = routedNumber(params, routedParams, 'sinPhase', 0);
+  return baseStrength * Math.sin(position * density * Math.PI * 2 + phase);
+}
+
+function wallMotion(
+  anim: number,
+  archStrength: number,
+  wallPower: number,
+  falloff: number,
+  centerPowerMask: number,
+  step: number,
+) {
+  const negativeArchMask = clamp01(-archStrength / 4);
+  const edgePulseFloor = 0.12 * negativeArchMask;
+  const shapedPowerMask = Math.max(centerPowerMask, edgePulseFloor);
+  const powerSpreadMask =
+    1 - negativeArchMask + shapedPowerMask * negativeArchMask;
+  const effectiveWallPower = wallPower * powerSpreadMask;
+  const bounceOffset = anim * 0.5 * powerSpreadMask;
+
+  return {
+    startOffset: falloff * archStrength * step + bounceOffset,
+    sizeAdd: Math.abs(anim) * effectiveWallPower,
+  };
 }
 
 function frontBackWallAnim(
@@ -1211,7 +1299,9 @@ function frontBackWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(x, xRows) * sineFalloff(y, yRows);
+  const fx = sineFalloff(x - 1, xRows - 2);
+  const fy = sineFalloff(y - 1, yRows - 2);
+  const falloff = (fx + fy) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1234,7 +1324,9 @@ function topBottomWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(x, xRows) * sineFalloff(z, zRows);
+  const fx = sineFalloff(x - 1, xRows - 2);
+  const fz = sineFalloff(z - 1, zRows - 2);
+  const falloff = (fx + fz) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1257,7 +1349,9 @@ function sideWallAnim(
   spectrum: number[],
   nyquist: number,
 ) {
-  const falloff = sineFalloff(y, yRows) * sineFalloff(z, zRows);
+  const fy = sineFalloff(y - 1, yRows - 2);
+  const fz = sineFalloff(z - 1, zRows - 2);
+  const falloff = (fy + fz) / 2;
   const spectralEnergy = spectrumValueHz(
     spectrum,
     nyquist,
@@ -1306,10 +1400,12 @@ function drawLeftRightWalls({
   );
 
   for (let y = 1; y < yRows - 1; y += 1) {
-    const falloffY = sineFalloff(y, yRows);
+    const falloffY = sineFalloff(y - 1, yRows - 2);
 
     for (let z = 1; z < zRows - 1; z += 1) {
-      const falloff = falloffY * sineFalloff(z, zRows);
+      const falloffZ = sineFalloff(z - 1, zRows - 2);
+      const falloff = (falloffY + falloffZ) / 2;
+
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1322,11 +1418,30 @@ function drawLeftRightWalls({
       const py = totalHeight / 2 - y * stepY - stepY / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
-      const leftMethod = params.leftFormula ?? 'new';
-      const rightMethod = params.rightFormula ?? 'new';
+      const archStrength = archStrengthWithSine(
+        params,
+        routedParams,
+        'leftRightArch',
+        0.5,
+        serpentinePosition(z, zRows, y, yRows),
+      );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'leftRightWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffY * falloffZ,
+        stepX,
+      );
+
       const edgeAlign = edgeAlignEnabled
         ? leftRightEdgeAlignment({
             params,
+            routedParams,
             xRows,
             y,
             z,
@@ -1343,17 +1458,14 @@ function drawLeftRightWalls({
         : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
-        const px =
-          leftMethod === 'old'
-            ? -totalWidth / 2 + stepX / 2 - anim / 2
-            : -totalWidth / 2 - anim + stepX * 2 - (stepX + stepX / 2);
+        const px = -totalWidth / 2 + stepX / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.left.y,
           warpedZ + edgeAlign.left.z,
-          xSize + anim,
+          xSize + sizeAdd,
           ySize,
           zSize,
           colorForBox(params, routedParams, 'left', falloff, energy, timeMs),
@@ -1361,17 +1473,14 @@ function drawLeftRightWalls({
       }
 
       if (wallEnabled(params, 'right')) {
-        const px =
-          rightMethod === 'old'
-            ? totalWidth / 2 - stepX / 2 + anim / 2
-            : totalWidth / 2 + anim - stepX * 2 + (stepX + stepX / 2);
+        const px = totalWidth / 2 - stepX / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.right.y,
           warpedZ + edgeAlign.right.z,
-          xSize + anim,
+          xSize + sizeAdd,
           ySize,
           zSize,
           colorForBox(params, routedParams, 'right', falloff, energy, timeMs),
@@ -1383,6 +1492,7 @@ function drawLeftRightWalls({
 
 type LeftRightEdgeAlignmentArgs = {
   params: SketchParams;
+  routedParams: NumericRecord;
   xRows: number;
   y: number;
   z: number;
@@ -1406,6 +1516,7 @@ function leftRightEdgeAlignment(args: LeftRightEdgeAlignmentArgs) {
 
 function leftRightEdgeAlignmentForX({
   params,
+  routedParams,
   x,
   y,
   z,
@@ -1425,9 +1536,22 @@ function leftRightEdgeAlignmentForX({
   const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
   const backWeight = edgeSideWeight(z, zRows, 'max', radius);
 
+  const topBottomStrength = routedNumber(
+    params,
+    routedParams,
+    'topBottomArch',
+    0.5,
+  );
+  const frontBackStrength = routedNumber(
+    params,
+    routedParams,
+    'frontBackArch',
+    1.5,
+  );
+
   const topOffset = wallEnabled(params, 'top')
     ? wallEdgeOffset(
-        params.topFormula ?? 'new',
+        topBottomStrength,
         'positive',
         topBottomWallAnim(
           x,
@@ -1443,7 +1567,7 @@ function leftRightEdgeAlignmentForX({
     : 0;
   const bottomOffset = wallEnabled(params, 'bottom')
     ? wallEdgeOffset(
-        params.bottomFormula ?? 'new',
+        topBottomStrength,
         'negative',
         topBottomWallAnim(
           x,
@@ -1458,8 +1582,8 @@ function leftRightEdgeAlignmentForX({
       )
     : 0;
   const frontOffset = wallEnabled(params, 'front')
-    ? frontBackWallEdgeOffset(
-        params.frontFormula ?? 'new',
+    ? wallEdgeOffset(
+        frontBackStrength,
         'negative',
         frontBackWallAnim(
           x,
@@ -1474,8 +1598,8 @@ function leftRightEdgeAlignmentForX({
       )
     : 0;
   const backOffset = wallEnabled(params, 'back')
-    ? frontBackWallEdgeOffset(
-        params.backFormula ?? 'new',
+    ? wallEdgeOffset(
+        frontBackStrength,
         'positive',
         frontBackWallAnim(
           x,
@@ -1532,10 +1656,12 @@ function drawTopBottomWalls({
   );
 
   for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x, xRows);
+    const falloffX = sineFalloff(x - 1, xRows - 2);
 
     for (let z = 1; z < zRows - 1; z += 1) {
-      const falloff = falloffX * sineFalloff(z, zRows);
+      const falloffZ = sineFalloff(z - 1, zRows - 2);
+      const falloff = (falloffX + falloffZ) / 2;
+
       const spectralEnergy = spectrumValueHz(
         spectrum,
         nyquist,
@@ -1548,11 +1674,30 @@ function drawTopBottomWalls({
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
-      const topMethod = params.topFormula ?? 'new';
-      const bottomMethod = params.bottomFormula ?? 'new';
+      const archStrength = archStrengthWithSine(
+        params,
+        routedParams,
+        'topBottomArch',
+        0.5,
+        serpentinePosition(x, xRows, z, zRows),
+      );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'topBottomWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffX * falloffZ,
+        stepY,
+      );
+
       const edgeAlign = edgeAlignEnabled
         ? topBottomEdgeAlignment({
             params,
+            routedParams,
             x,
             z,
             xRows,
@@ -1569,10 +1714,7 @@ function drawTopBottomWalls({
         : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
-        const py =
-          topMethod === 'old'
-            ? totalHeight / 2 - stepY / 2 + anim / 2
-            : totalHeight / 2 - stepY * 2 + anim + (stepY + stepY / 2);
+        const py = totalHeight / 2 - stepY / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
@@ -1580,17 +1722,14 @@ function drawTopBottomWalls({
           py,
           warpedZ + edgeAlign.top.z,
           xSize,
-          ySize + anim,
+          ySize + sizeAdd,
           zSize,
           colorForBox(params, routedParams, 'top', falloff, energy, timeMs),
         );
       }
 
       if (wallEnabled(params, 'bottom')) {
-        const py =
-          bottomMethod === 'old'
-            ? -totalHeight / 2 + stepY / 2 - anim / 2
-            : -totalHeight / 2 + stepY * 2 - anim - (stepY + stepY / 2);
+        const py = -totalHeight / 2 + stepY / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
@@ -1598,7 +1737,7 @@ function drawTopBottomWalls({
           py,
           warpedZ + edgeAlign.bottom.z,
           xSize,
-          ySize + anim,
+          ySize + sizeAdd,
           zSize,
           colorForBox(params, routedParams, 'bottom', falloff, energy, timeMs),
         );
@@ -1609,6 +1748,7 @@ function drawTopBottomWalls({
 
 type TopBottomEdgeAlignmentArgs = {
   params: SketchParams;
+  routedParams: NumericRecord;
   x: number;
   z: number;
   xRows: number;
@@ -1632,6 +1772,7 @@ function topBottomEdgeAlignment(args: TopBottomEdgeAlignmentArgs) {
 
 function topBottomEdgeAlignmentForY({
   params,
+  routedParams,
   x,
   y,
   z,
@@ -1651,9 +1792,22 @@ function topBottomEdgeAlignmentForY({
   const frontWeight = edgeSideWeight(z, zRows, 'min', radius);
   const backWeight = edgeSideWeight(z, zRows, 'max', radius);
 
+  const leftRightStrength = routedNumber(
+    params,
+    routedParams,
+    'leftRightArch',
+    0.5,
+  );
+  const frontBackStrength = routedNumber(
+    params,
+    routedParams,
+    'frontBackArch',
+    1.5,
+  );
+
   const leftOffset = wallEnabled(params, 'left')
     ? wallEdgeOffset(
-        params.leftFormula ?? 'new',
+        leftRightStrength,
         'negative',
         sideWallAnim(
           y,
@@ -1669,7 +1823,7 @@ function topBottomEdgeAlignmentForY({
     : 0;
   const rightOffset = wallEnabled(params, 'right')
     ? wallEdgeOffset(
-        params.rightFormula ?? 'new',
+        leftRightStrength,
         'positive',
         sideWallAnim(
           y,
@@ -1684,8 +1838,8 @@ function topBottomEdgeAlignmentForY({
       )
     : 0;
   const frontOffset = wallEnabled(params, 'front')
-    ? frontBackWallEdgeOffset(
-        params.frontFormula ?? 'new',
+    ? wallEdgeOffset(
+        frontBackStrength,
         'negative',
         frontBackWallAnim(
           x,
@@ -1700,8 +1854,8 @@ function topBottomEdgeAlignmentForY({
       )
     : 0;
   const backOffset = wallEnabled(params, 'back')
-    ? frontBackWallEdgeOffset(
-        params.backFormula ?? 'new',
+    ? wallEdgeOffset(
+        frontBackStrength,
         'positive',
         frontBackWallAnim(
           x,

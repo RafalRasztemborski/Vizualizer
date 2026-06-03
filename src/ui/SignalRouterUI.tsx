@@ -3,6 +3,7 @@ import { SignalRouter } from './SignalRouter';
 import { SmoothingNode } from './SmoothingNode';
 import { SourceNode } from './SourceNode';
 import { TargetNode } from './TargetNode';
+import { WaveTransformNode } from './WaveTransformNode';
 import { INode, IPort } from './types';
 
 interface Props {
@@ -42,6 +43,11 @@ export const SignalRouterUI: React.FC<Props> = ({
     refresh();
   };
 
+  const addWaveTransform = () => {
+    router.addNode(new WaveTransformNode(crypto.randomUUID()));
+    refresh();
+  };
+
   const removeNode = (id: string) => {
     router.removeNode(id);
     refresh();
@@ -69,6 +75,7 @@ export const SignalRouterUI: React.FC<Props> = ({
             ))}
           </select>
           <button onClick={addSmoothing}>+ Smooth</button>
+          <button onClick={addWaveTransform}>+ Wave</button>
         </div>
       </div>
 
@@ -111,6 +118,52 @@ export const SignalRouterUI: React.FC<Props> = ({
                     value={node.factor}
                     onChange={(e) => {
                       node.factor = parseFloat(e.target.value);
+                      onUpdate();
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+
+            {node instanceof WaveTransformNode && (
+              <div className="node-params">
+                <label>
+                  Function:
+                  <select
+                    value={node.mode}
+                    onChange={(e) => {
+                      node.mode = e.target.value as 'sine' | 'cosine';
+                      onUpdate();
+                    }}
+                  >
+                    <option value="sine">Sine</option>
+                    <option value="cosine">Cosine</option>
+                  </select>
+                </label>
+                <label>
+                  Density: {node.density.toFixed(2)}
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.01"
+                    value={node.density}
+                    onChange={(e) => {
+                      node.density = parseFloat(e.target.value);
+                      onUpdate();
+                    }}
+                  />
+                </label>
+                <label>
+                  Phase: {node.phase.toFixed(2)}
+                  <input
+                    type="range"
+                    min="-3.14"
+                    max="3.14"
+                    step="0.01"
+                    value={node.phase}
+                    onChange={(e) => {
+                      node.phase = parseFloat(e.target.value);
                       onUpdate();
                     }}
                   />
