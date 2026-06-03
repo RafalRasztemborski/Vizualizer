@@ -710,28 +710,55 @@ export const dupaSketch: P5SketchModule = {
       key: 'frontBackArch',
       label: 'F/B Arch Strength',
       type: 'number',
-      min: 0,
+      min: -4,
       max: 4,
       step: 0.01,
       defaultValue: 1.5,
     },
     {
+      key: 'frontBackWallPower',
+      label: 'F/B Wall Power',
+      type: 'number',
+      min: 0,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1,
+    },
+    {
       key: 'leftRightArch',
       label: 'L/R Arch Strength',
       type: 'number',
-      min: 0,
+      min: -4,
       max: 4,
       step: 0.01,
       defaultValue: 0.5,
     },
     {
-      key: 'topBottomArch',
-      label: 'T/B Arch Strength',
+      key: 'leftRightWallPower',
+      label: 'L/R Wall Power',
       type: 'number',
       min: 0,
       max: 4,
       step: 0.01,
+      defaultValue: 1,
+    },
+    {
+      key: 'topBottomArch',
+      label: 'T/B Arch Strength',
+      type: 'number',
+      min: -4,
+      max: 4,
+      step: 0.01,
       defaultValue: 0.5,
+    },
+    {
+      key: 'topBottomWallPower',
+      label: 'T/B Wall Power',
+      type: 'number',
+      min: 0,
+      max: 4,
+      step: 0.01,
+      defaultValue: 1,
     },
   ],
   setup(p) {
@@ -999,6 +1026,18 @@ function drawFrontBackWalls({
         'frontBackArch',
         1.5,
       );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'frontBackWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffX * falloffY,
+        stepZ,
+      );
       const edgeAlign = edgeAlignEnabled
         ? frontBackEdgeAlignment({
             params,
@@ -1019,7 +1058,7 @@ function drawFrontBackWalls({
         : { front: { x: 0, y: 0 }, back: { x: 0, y: 0 } };
 
       if (wallEnabled(params, 'front')) {
-        const pz = -totalDepth / 2 + stepZ / 2 - anim * (0.5 + archStrength);
+        const pz = -totalDepth / 2 + stepZ / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
@@ -1028,13 +1067,13 @@ function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + anim,
+          zSize + sizeAdd,
           colorForBox(params, routedParams, 'front', falloff, energy, timeMs),
         );
       }
 
       if (wallEnabled(params, 'back')) {
-        const pz = totalDepth / 2 - stepZ / 2 + anim * (0.5 + archStrength);
+        const pz = totalDepth / 2 - stepZ / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
@@ -1043,7 +1082,7 @@ function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + anim,
+          zSize + sizeAdd,
           colorForBox(params, routedParams, 'back', falloff, energy, timeMs),
         );
       }
@@ -1186,7 +1225,31 @@ function wallEdgeOffset(
   direction: 'negative' | 'positive',
   anim: number,
 ) {
-  return (direction === 'positive' ? 1 : -1) * anim * (0.5 + strength);
+  return (
+    (direction === 'positive' ? 1 : -1) *
+    anim *
+    (0.5 + Math.max(0, strength))
+  );
+}
+
+function wallMotion(
+  anim: number,
+  archStrength: number,
+  wallPower: number,
+  falloff: number,
+  centerPowerMask: number,
+  step: number,
+) {
+  const negativeArchMask = clamp01(-archStrength / 4);
+  const powerSpreadMask =
+    1 - negativeArchMask + centerPowerMask * negativeArchMask;
+  const effectiveWallPower = wallPower * powerSpreadMask;
+  const bounceOffset = anim * 0.5 * powerSpreadMask;
+
+  return {
+    startOffset: falloff * archStrength * step + bounceOffset,
+    sizeAdd: Math.abs(anim) * effectiveWallPower,
+  };
 }
 
 function frontBackWallAnim(
@@ -1324,6 +1387,18 @@ function drawLeftRightWalls({
         'leftRightArch',
         0.5,
       );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'leftRightWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffY * falloffZ,
+        stepX,
+      );
 
       const edgeAlign = edgeAlignEnabled
         ? leftRightEdgeAlignment({
@@ -1345,14 +1420,14 @@ function drawLeftRightWalls({
         : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
-        const px = -totalWidth / 2 + stepX / 2 - anim * (0.5 + archStrength);
+        const px = -totalWidth / 2 + stepX / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.left.y,
           warpedZ + edgeAlign.left.z,
-          xSize + anim,
+          xSize + sizeAdd,
           ySize,
           zSize,
           colorForBox(params, routedParams, 'left', falloff, energy, timeMs),
@@ -1360,14 +1435,14 @@ function drawLeftRightWalls({
       }
 
       if (wallEnabled(params, 'right')) {
-        const px = totalWidth / 2 - stepX / 2 + anim * (0.5 + archStrength);
+        const px = totalWidth / 2 - stepX / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.right.y,
           warpedZ + edgeAlign.right.z,
-          xSize + anim,
+          xSize + sizeAdd,
           ySize,
           zSize,
           colorForBox(params, routedParams, 'right', falloff, energy, timeMs),
@@ -1567,6 +1642,18 @@ function drawTopBottomWalls({
         'topBottomArch',
         0.5,
       );
+      const wallPower = Math.max(
+        0,
+        routedNumber(params, routedParams, 'topBottomWallPower', 1),
+      );
+      const { startOffset, sizeAdd } = wallMotion(
+        anim,
+        archStrength,
+        wallPower,
+        falloff,
+        falloffX * falloffZ,
+        stepY,
+      );
 
       const edgeAlign = edgeAlignEnabled
         ? topBottomEdgeAlignment({
@@ -1588,7 +1675,7 @@ function drawTopBottomWalls({
         : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
-        const py = totalHeight / 2 - stepY / 2 + anim * (0.5 + archStrength);
+        const py = totalHeight / 2 - stepY / 2 + startOffset + sizeAdd / 2;
 
         drawBox(
           p,
@@ -1596,14 +1683,14 @@ function drawTopBottomWalls({
           py,
           warpedZ + edgeAlign.top.z,
           xSize,
-          ySize + anim,
+          ySize + sizeAdd,
           zSize,
           colorForBox(params, routedParams, 'top', falloff, energy, timeMs),
         );
       }
 
       if (wallEnabled(params, 'bottom')) {
-        const py = -totalHeight / 2 + stepY / 2 - anim * (0.5 + archStrength);
+        const py = -totalHeight / 2 + stepY / 2 - startOffset - sizeAdd / 2;
 
         drawBox(
           p,
@@ -1611,7 +1698,7 @@ function drawTopBottomWalls({
           py,
           warpedZ + edgeAlign.bottom.z,
           xSize,
-          ySize + anim,
+          ySize + sizeAdd,
           zSize,
           colorForBox(params, routedParams, 'bottom', falloff, energy, timeMs),
         );
