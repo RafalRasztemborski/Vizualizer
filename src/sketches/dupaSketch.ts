@@ -760,6 +760,24 @@ export const dupaSketch: P5SketchModule = {
       step: 0.01,
       defaultValue: 1,
     },
+    {
+      key: 'sinDensity',
+      label: 'Arch Sin Density',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.01,
+      defaultValue: 0,
+    },
+    {
+      key: 'sinPhase',
+      label: 'Arch Sin Phase',
+      type: 'number',
+      min: -3.14,
+      max: 3.14,
+      step: 0.01,
+      defaultValue: 0,
+    },
   ],
   setup(p) {
     // Wyłączenie antialiasingu i prośba o wysoką wydajność GPU
@@ -1020,11 +1038,12 @@ function drawFrontBackWalls({
       const anim = falloff * energy * audioDepth;
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const py = totalHeight / 2 - y * stepY - stepY / 2;
-      const archStrength = routedNumber(
+      const archStrength = archStrengthWithSine(
         params,
         routedParams,
         'frontBackArch',
         1.5,
+        serpentinePosition(x, xRows, y, yRows),
       );
       const wallPower = Math.max(
         0,
@@ -1230,6 +1249,24 @@ function wallEdgeOffset(
   );
 }
 
+function archStrengthWithSine(
+  params: SketchParams,
+  routedParams: NumericRecord,
+  key: string,
+  fallback: number,
+  position: number,
+) {
+  const baseStrength = routedNumber(params, routedParams, key, fallback);
+  const density = Math.max(
+    0,
+    routedNumber(params, routedParams, 'sinDensity', 0),
+  );
+  if (density <= 0) return baseStrength;
+
+  const phase = routedNumber(params, routedParams, 'sinPhase', 0);
+  return baseStrength * Math.sin(position * density * Math.PI * 2 + phase);
+}
+
 function wallMotion(
   anim: number,
   archStrength: number,
@@ -1381,11 +1418,12 @@ function drawLeftRightWalls({
       const py = totalHeight / 2 - y * stepY - stepY / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
-      const archStrength = routedNumber(
+      const archStrength = archStrengthWithSine(
         params,
         routedParams,
         'leftRightArch',
         0.5,
+        serpentinePosition(z, zRows, y, yRows),
       );
       const wallPower = Math.max(
         0,
@@ -1636,11 +1674,12 @@ function drawTopBottomWalls({
       const px = -totalWidth / 2 + x * stepX + stepX / 2;
       const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
       const warpedZ = pz + pz * crazyZ;
-      const archStrength = routedNumber(
+      const archStrength = archStrengthWithSine(
         params,
         routedParams,
         'topBottomArch',
         0.5,
+        serpentinePosition(x, xRows, z, zRows),
       );
       const wallPower = Math.max(
         0,
