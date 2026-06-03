@@ -1226,9 +1226,7 @@ function wallEdgeOffset(
   anim: number,
 ) {
   return (
-    (direction === 'positive' ? 1 : -1) *
-    anim *
-    (0.5 + Math.max(0, strength))
+    (direction === 'positive' ? 1 : -1) * anim * (0.5 + Math.max(0, strength))
   );
 }
 

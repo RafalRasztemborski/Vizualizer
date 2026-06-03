@@ -9,6 +9,7 @@ import { LerpNode } from './LerpNode';
 import { ClampNode } from './ClampNode';
 import { CurveNode } from './CurveNode';
 import { RemapNode } from './RemapNode';
+import { WaveTransformNode } from './WaveTransformNode';
 import {
   SignalStrengthenerProNode,
   StrengthenerMode,
@@ -66,6 +67,9 @@ export const PipelineEditor = React.memo<{
           break;
         case 'remap':
           node = new RemapNode(id);
+          break;
+        case 'wave':
+          node = new WaveTransformNode(id);
           break;
         case 'strengthener_pro':
           node = new SignalStrengthenerProNode(id);
@@ -305,6 +309,13 @@ export const PipelineEditor = React.memo<{
                                   }
                                 >
                                   Remap
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleAddNode('wave', trackIdx, i + 1)
+                                  }
+                                >
+                                  Wave Transform
                                 </button>
                                 <button
                                   onClick={() =>
@@ -729,6 +740,55 @@ const PipelineNodeCard = React.memo<{
                   }}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {node instanceof WaveTransformNode && (
+          <div className="node-settings">
+            <select
+              className="compact-select"
+              value={node.mode}
+              onChange={(e) => {
+                node.mode = e.target.value as 'sine' | 'cosine';
+                onUpdate();
+              }}
+              style={{ marginBottom: '4px' }}
+            >
+              <option value="sine">Sine</option>
+              <option value="cosine">Cosine</option>
+            </select>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Density: {node.density.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="-10"
+                max="10"
+                step="0.01"
+                value={node.density}
+                onChange={(e) => {
+                  node.density = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Phase: {node.phase.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="-3.14"
+                max="3.14"
+                step="0.01"
+                value={node.phase}
+                onChange={(e) => {
+                  node.phase = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
             </div>
           </div>
         )}
