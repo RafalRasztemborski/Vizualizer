@@ -1239,8 +1239,10 @@ function wallMotion(
   step: number,
 ) {
   const negativeArchMask = clamp01(-archStrength / 4);
+  const edgePulseFloor = 0.12 * negativeArchMask;
+  const shapedPowerMask = Math.max(centerPowerMask, edgePulseFloor);
   const powerSpreadMask =
-    1 - negativeArchMask + centerPowerMask * negativeArchMask;
+    1 - negativeArchMask + shapedPowerMask * negativeArchMask;
   const effectiveWallPower = wallPower * powerSpreadMask;
   const bounceOffset = anim * 0.5 * powerSpreadMask;
 
