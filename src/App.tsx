@@ -89,6 +89,65 @@ export function App() {
     setRouterVersion((v) => v + 1);
   };
 
+  const toggleSignalRouter = (index: number) => {
+    const router = signalRouters[index];
+    if (!router) return;
+    router.setEnabled(!router.isEnabled());
+    setRouterVersion((v) => v + 1);
+  };
+
+  const duplicateSignalRouter = (index: number) => {
+    const router = signalRouters[index];
+    if (!router) return;
+    setSignalRouters((prev) => {
+      const next = [...prev];
+      next.splice(index + 1, 0, router.clone());
+      return next;
+    });
+    setRouterVersion((v) => v + 1);
+  };
+
+  const branchSignalRouter = (index: number, nodeId: string) => {
+    const router = signalRouters[index];
+    if (!router) return;
+    const branch = router.branchFromNode(nodeId, targetKeys[0] || 'audioDepth');
+    if (!branch) return;
+    setSignalRouters((prev) => {
+      const next = [...prev];
+      next.splice(index + 1, 0, branch);
+      return next;
+    });
+    setRouterVersion((v) => v + 1);
+  };
+
+  const exportSignalRouters = () =>
+    JSON.stringify(
+      {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        routers: signalRouters.map((router) => router.toJSON()),
+      },
+      null,
+      2,
+    );
+
+  const importSignalRouters = (json: string) => {
+    const parsed = JSON.parse(json) as { routers?: unknown };
+    if (!Array.isArray(parsed.routers)) {
+      throw new Error('Router file does not contain a routers array.');
+    }
+
+    const nextRouters = parsed.routers.map((router) =>
+      SignalRouter.fromJSON(router as Parameters<typeof SignalRouter.fromJSON>[0]),
+    );
+    if (!nextRouters.length) {
+      throw new Error('Router file does not contain any signal paths.');
+    }
+
+    setSignalRouters(nextRouters);
+    setRouterVersion((v) => v + 1);
+  };
+
   const [, setRouterVersion] = useState(0);
   const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
@@ -134,6 +193,8 @@ export function App() {
 
       // Przetwarzanie wszystkich grafów sygnałów
       for (const router of signalRouters) {
+        if (!router.isEnabled()) continue;
+
         router.update(sources);
 
         // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
@@ -295,6 +356,11 @@ export function App() {
         onUpdate={() => setRouterVersion((v) => v + 1)}
         onAddRoute={addSignalRouter}
         onRemoveRoute={removeSignalRouter}
+        onToggleRoute={toggleSignalRouter}
+        onDuplicateRoute={duplicateSignalRouter}
+        onBranchRoute={branchSignalRouter}
+        onExportRoutes={exportSignalRouters}
+        onImportRoutes={importSignalRouters}
       />
     </main>
   );

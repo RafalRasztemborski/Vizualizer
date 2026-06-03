@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { SignalRouter } from './SignalRouter';
 import { INode } from './types';
 import { SourceNode } from './SourceNode';
@@ -15,6 +15,17 @@ import {
   StrengthenerMode,
 } from './SignalStrengthenerProNode';
 
+const PROCESSOR_OPTIONS = [
+  { type: 'lerp', label: 'Lerp' },
+  { type: 'smoothing', label: 'Smoothing' },
+  { type: 'strength', label: 'Strength' },
+  { type: 'clamp', label: 'Clamp' },
+  { type: 'curve', label: 'Curve' },
+  { type: 'remap', label: 'Remap' },
+  { type: 'wave', label: 'Wave Transform' },
+  { type: 'strengthener_pro', label: 'Strengthener PRO' },
+];
+
 export const PipelineEditor = React.memo<{
   routers: SignalRouter[];
   sourceKeys: string[];
@@ -22,6 +33,11 @@ export const PipelineEditor = React.memo<{
   onUpdate: () => void;
   onAddRoute: () => void;
   onRemoveRoute: (index: number) => void;
+  onToggleRoute: (index: number) => void;
+  onDuplicateRoute: (index: number) => void;
+  onBranchRoute: (index: number, nodeId: string) => void;
+  onExportRoutes: () => string;
+  onImportRoutes: (json: string) => void;
 }>(
   ({
     routers,
@@ -30,9 +46,16 @@ export const PipelineEditor = React.memo<{
     onUpdate,
     onAddRoute,
     onRemoveRoute,
+    onToggleRoute,
+    onDuplicateRoute,
+    onBranchRoute,
+    onExportRoutes,
+    onImportRoutes,
   }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState(0);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     // State przechowujący pozycję: [indexŚcieżki, indexGdzieWstawić]
     const [selectorPos, setSelectorPos] = useState<[number, number] | null>(
       null,
@@ -83,6 +106,40 @@ export const PipelineEditor = React.memo<{
       onUpdate();
     };
 
+    const handleSaveRoutes = () => {
+      const json = onExportRoutes();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `signal-router-${new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const handleLoadRoutes = (file: File | undefined) => {
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          onImportRoutes(String(reader.result ?? ''));
+          setSelectorPos(null);
+          setSelectedTrack(0);
+          onUpdate();
+        } catch (error) {
+          window.alert(
+            error instanceof Error
+              ? error.message
+              : 'Could not load router JSON.',
+          );
+        }
+      };
+      reader.readAsText(file);
+    };
+
     return (
       <div
         className={`pipeline-container ${isCollapsed ? 'collapsed' : ''}`}
@@ -106,6 +163,54 @@ export const PipelineEditor = React.memo<{
         >
           <h2>Signal Flow Pipeline Explorer</h2>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {!isCollapsed && (
+              <>
+                <button
+                  className="btn-small"
+                  title="Save all signal paths to JSON"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    handleSaveRoutes();
+                  }}
+                >
+                  Save JSON
+                </button>
+                <button
+                  className="btn-small"
+                  title="Load signal paths from JSON"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  Load JSON
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="router-file-input"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    handleLoadRoutes(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+              </>
+            )}
+            {!isCollapsed && (
+              <button
+                className="btn-small"
+                title="Duplicate selected signal path"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onDuplicateRoute(selectedTrack);
+                }}
+                disabled={!routers[selectedTrack]}
+              >
+                Copy Selected
+              </button>
+            )}
             {!isCollapsed && (
               <button
                 className="btn-small"
@@ -164,15 +269,16 @@ export const PipelineEditor = React.memo<{
           }}
         >
           {!isCollapsed &&
-            routers.map((router, trackIdx) => (
+            routers.map((router, trackIdx) => {
+              const routeEnabled = router.isEnabled();
+              const isSelected = selectedTrack === trackIdx;
+
+              return (
               <div
                 key={trackIdx}
-                className="pipeline-track-container"
+                className={`pipeline-track-container ${isSelected ? 'is-selected' : ''} ${!routeEnabled ? 'is-disabled' : ''}`}
+                onClick={() => setSelectedTrack(trackIdx)}
                 style={{
-                  borderLeft: '2px solid rgba(57, 210, 192, 0.2)',
-                  paddingLeft: '15px',
-                  background: 'rgba(255,255,255,0.02)',
-                  borderRadius: '4px',
                   position: 'relative',
                   zIndex: selectorPos?.[0] === trackIdx ? 100 : 1,
                   overflow: 'visible', // Zapobiega ucinaniu dropdownu przez kontener ścieżki
@@ -196,11 +302,44 @@ export const PipelineEditor = React.memo<{
                     }}
                   >
                     Signal Path #{trackIdx + 1}
+                    {!routeEnabled ? ' / Muted' : ''}
                   </span>
-                  {routers.length > 1 && (
+                  <div className="path-actions">
+                    <button
+                      className={`btn-small path-power-btn ${routeEnabled ? 'is-on' : 'is-off'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleRoute(trackIdx);
+                      }}
+                      title={
+                        routeEnabled
+                          ? 'Disable this signal path'
+                          : 'Enable this signal path'
+                      }
+                    >
+                      {routeEnabled ? 'On' : 'Off'}
+                    </button>
                     <button
                       className="btn-small"
-                      onClick={() => onRemoveRoute(trackIdx)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTrack(trackIdx);
+                        onDuplicateRoute(trackIdx);
+                      }}
+                      title="Duplicate this signal path"
+                    >
+                      Copy
+                    </button>
+                    {routers.length > 1 && (
+                    <button
+                      className="btn-small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveRoute(trackIdx);
+                        setSelectedTrack((current) =>
+                          Math.max(0, Math.min(current, routers.length - 2)),
+                        );
+                      }}
                       style={{
                         color: '#ff4d4d',
                         border: '1px solid rgba(255,77,77,0.3)',
@@ -208,7 +347,8 @@ export const PipelineEditor = React.memo<{
                     >
                       Remove Path
                     </button>
-                  )}
+                    )}
+                  </div>
                 </div>
                 <div
                   className="pipeline-track"
@@ -235,6 +375,10 @@ export const PipelineEditor = React.memo<{
                         isFirst={i === 0}
                         isLast={i === nodes.length - 1}
                         onUpdate={onUpdate}
+                        onBranch={() => {
+                          onBranchRoute(trackIdx, node.id);
+                          setSelectedTrack(trackIdx + 1);
+                        }}
                       />
                       {i < nodes.length - 1 && (
                         <div
@@ -259,79 +403,29 @@ export const PipelineEditor = React.memo<{
                           </button>
                           {selectorPos?.[0] === trackIdx &&
                             selectorPos?.[1] === i + 1 && (
-                              <div
-                                className="node-selector-dropdown"
-                                style={{
-                                  zIndex: 1000,
-                                  position: 'absolute',
-                                  top: '25px', // Gwarantuje, że otworzy się pod przyciskiem +
-                                  left: '0',
-                                }}
-                              >
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('lerp', trackIdx, i + 1)
-                                  }
-                                >
-                                  Lerp
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('smoothing', trackIdx, i + 1)
-                                  }
-                                >
-                                  Smoothing
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('strength', trackIdx, i + 1)
-                                  }
-                                >
-                                  Strength
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('clamp', trackIdx, i + 1)
-                                  }
-                                >
-                                  Clamp
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('curve', trackIdx, i + 1)
-                                  }
-                                >
-                                  Curve
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('remap', trackIdx, i + 1)
-                                  }
-                                >
-                                  Remap
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode('wave', trackIdx, i + 1)
-                                  }
-                                >
-                                  Wave Transform
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleAddNode(
-                                      'strengthener_pro',
-                                      trackIdx,
-                                      i + 1,
-                                    )
-                                  }
-                                >
-                                  Strengthener PRO
-                                </button>
+                              <div className="node-selector-dropdown">
+                                {PROCESSOR_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.type}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddNode(
+                                        option.type,
+                                        trackIdx,
+                                        i + 1,
+                                      );
+                                    }}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
                                 <div className="divider" />
                                 <button
                                   className="cancel"
-                                  onClick={() => setSelectorPos(null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectorPos(null);
+                                  }}
                                 >
                                   Cancel
                                 </button>
@@ -343,7 +437,8 @@ export const PipelineEditor = React.memo<{
                   ))}
                 </div>
               </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     );
@@ -402,6 +497,7 @@ const PipelineNodeCard = React.memo<{
   isFirst: boolean;
   isLast: boolean;
   onUpdate: () => void;
+  onBranch: () => void;
 }>(
   ({
     node,
@@ -412,6 +508,7 @@ const PipelineNodeCard = React.memo<{
     isFirst,
     isLast,
     onUpdate,
+    onBranch,
   }) => {
     const inputVal = Object.values(node.inputs)[0]?.value ?? 0;
     const outputVal = Object.values(node.outputs)[0]?.value ?? inputVal;
@@ -431,22 +528,10 @@ const PipelineNodeCard = React.memo<{
       >
         {!isAnchor && (
           <button
+            className={`node-active-toggle ${isEnabled ? 'is-on' : 'is-off'}`}
             onClick={() => {
               (node as any).enabled = !isEnabled;
               onUpdate();
-            }}
-            style={{
-              position: 'absolute',
-              top: '8px',
-              left: '8px',
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              backgroundColor: isEnabled ? '#28c840' : '#ff5f57',
-              border: isEnabled ? '1px solid #1aab29' : '1px solid #e0443e',
-              cursor: 'pointer',
-              zIndex: 100,
-              padding: 0,
             }}
             title={
               isEnabled
@@ -500,6 +585,15 @@ const PipelineNodeCard = React.memo<{
                   >
                     ×
                   </button>
+                  {node.type !== 'target' && (
+                    <button
+                      onClick={onBranch}
+                      title="Branch output to a new path"
+                      style={{ padding: '0 5px', minHeight: '18px' }}
+                    >
+                      ⎇
+                    </button>
+                  )}
                 </>
               )}
             </div>
