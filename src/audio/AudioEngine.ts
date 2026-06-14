@@ -211,7 +211,7 @@ export class AudioEngine {
       high: legacyHigh,
       kickEnergy: state.onset * 2,
       detectedKick: state.onset ? 1 : 0,
-      nyquist: this.context.sampleRate / 2,
+      nyquist: this.context.sampleRate, // / 2,
       fps,
     };
 
