@@ -552,7 +552,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.39,
+      defaultValue: 0.57,
     },
     {
       key: 'spectrumSmLR',
@@ -579,7 +579,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.24,
+      defaultValue: 0.41,
     },
     {
       key: 'pulseSmFB',
