@@ -1,14 +1,7 @@
-export { AudioEngine } from './src/audio/AudioEngine';
-export {
-  DEFAULT_AUDIO_BAND_CONFIG,
-  EMPTY_SIGNALS,
-  inferConfigControls,
-  processAudioBands,
-} from './src/audio/audioBands';
+export { AudioEngine, EMPTY_SIGNALS } from './src/audio/AudioEngine';
 export { MidiManager } from './src/midi/MidiManager';
 export { sketches } from './src/sketches/registry';
 export type {
-  AnalyzerConfig,
   NumericRecord,
   P5SketchModule,
   ParamDefinition,

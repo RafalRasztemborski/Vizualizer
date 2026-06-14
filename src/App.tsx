@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AudioEngine } from './audio/AudioEngine';
-import { EMPTY_SIGNALS } from './audio/audioBands';
+import { AudioEngine, EMPTY_SIGNALS } from './audio/AudioEngine';
 import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
 import { sketches } from './sketches/registry';
@@ -138,7 +137,9 @@ export function App() {
     }
 
     const nextRouters = parsed.routers.map((router) =>
-      SignalRouter.fromJSON(router as Parameters<typeof SignalRouter.fromJSON>[0]),
+      SignalRouter.fromJSON(
+        router as Parameters<typeof SignalRouter.fromJSON>[0],
+      ),
     );
     if (!nextRouters.length) {
       throw new Error('Router file does not contain any signal paths.');

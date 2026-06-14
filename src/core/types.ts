@@ -3,18 +3,29 @@ import type p5 from 'p5';
 export type NumericRecord = Record<string, number>;
 
 export type ReactiveSignals = {
-  detectedKick: number;
-  kick: number;
-  bass: number;
-  bassWithoutKick: number;
-  cleanedBass: number;
-  mid: number;
-  high: number;
-  kickEnergy: number;
-  lastKickTime: number;
-  nyquist: number;
-  fps: number;
   dataArray: number[];
+  centroid: number;
+  flux: number;
+  onset: number;
+  beatPhase: number | null;
+  band0: number;
+  band1: number;
+  band2: number;
+  band3: number;
+  band4: number;
+  band5: number;
+  // legacy fields kept optional for compatibility only
+  detectedKick?: number;
+  kick?: number;
+  bass?: number;
+  bassWithoutKick?: number;
+  cleanedBass?: number;
+  mid?: number;
+  high?: number;
+  kickEnergy?: number;
+  lastKickTime?: number;
+  nyquist?: number;
+  fps?: number;
 };
 
 export type AnalyzerConfig = NumericRecord;
