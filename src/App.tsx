@@ -8,6 +8,7 @@ import { ParameterControls } from './ui/ParameterControls';
 import { SignalRouter } from './ui/SignalRouter';
 import { SignalRouterUI } from './ui/SignalRouterUI';
 import { Transport } from './ui/Transport';
+import { collectChainSources } from './ui/chainSources';
 import { SourceNode } from './ui/SourceNode';
 import { TargetNode } from './ui/TargetNode';
 import { PipelineEditor } from './ui/PipelineEditor';
@@ -218,18 +219,19 @@ export function App() {
     const tick = () => {
       const nextSignals = audioRef.current.update();
       const nextMidi = midiRef.current.currentValues;
-      const sources = { ...numericSignals(nextSignals), ...nextMidi };
+      const baseSources = { ...numericSignals(nextSignals), ...nextMidi };
+      const chainSources: NumericRecord = {};
       const nextRouted: NumericRecord = {};
 
-      // Przetwarzanie wszystkich grafów sygnałów
-      for (const router of signalRouters) {
+      // Przetwarzanie ścieżek sekwencyjnie — target poprzedniej ścieżki
+      // jest dostępny jako źródło w kolejnych (pathN:param).
+      for (let pathIndex = 0; pathIndex < signalRouters.length; pathIndex++) {
+        const router = signalRouters[pathIndex];
         if (!router.isEnabled()) continue;
 
-        router.update(sources);
+        router.update({ ...baseSources, ...chainSources });
 
-        // Pobranie wartości z TargetNode i dodanie ich do parametrów zsumowanych
-        const currentNodes = router.getNodes();
-        for (const node of currentNodes) {
+        for (const node of router.getNodes()) {
           if (node instanceof TargetNode) {
             const val = node.inputs.in.value;
             if (typeof val === 'number') {
@@ -238,6 +240,11 @@ export function App() {
             }
           }
         }
+
+        Object.assign(
+          chainSources,
+          collectChainSources(router, pathIndex),
+        );
       }
 
       runtimeRef.current = {

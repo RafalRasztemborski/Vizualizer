@@ -8,15 +8,21 @@ import { SignalStrengthNode } from './SignalStrengthNode';
 import { LerpNode } from './LerpNode';
 import { ClampNode } from './ClampNode';
 import { CurveNode } from './CurveNode';
+import { InverterNode } from './InverterNode';
 import { RemapNode } from './RemapNode';
 import { WaveTransformNode } from './WaveTransformNode';
 import {
   SignalStrengthenerProNode,
   StrengthenerMode,
 } from './SignalStrengthenerProNode';
+import {
+  chainSourceKeysForTrack,
+  formatChainSourceLabel,
+} from './chainSources';
 
 const PROCESSOR_OPTIONS = [
   { type: 'lerp', label: 'Lerp' },
+  { type: 'inverter', label: 'Inverter' },
   { type: 'smoothing', label: 'Smoothing' },
   { type: 'strength', label: 'Strength' },
   { type: 'clamp', label: 'Clamp' },
@@ -81,6 +87,9 @@ export const PipelineEditor = React.memo<{
           break;
         case 'lerp':
           node = new LerpNode(id);
+          break;
+        case 'inverter':
+          node = new InverterNode(id);
           break;
         case 'clamp':
           node = new ClampNode(id);
@@ -362,7 +371,10 @@ export const PipelineEditor = React.memo<{
                     <React.Fragment key={node.id}>
                       <PipelineNodeCard
                         node={node}
-                        sourceKeys={sourceKeys}
+                        sourceKeys={[
+                          ...sourceKeys,
+                          ...chainSourceKeysForTrack(routers, trackIdx),
+                        ]}
                         targetKeys={targetKeys}
                         onRemove={() => {
                           router.removeNode(node.id);
@@ -610,7 +622,7 @@ const PipelineNodeCard = React.memo<{
             >
               {sourceKeys.map((k) => (
                 <option key={k} value={k}>
-                  {k}
+                  {k.startsWith('path') ? formatChainSourceLabel(k) : k}
                 </option>
               ))}
             </select>

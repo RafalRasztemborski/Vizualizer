@@ -1,6 +1,7 @@
 import { INode, IConnection, SignalValue } from './types';
 import { ClampNode } from './ClampNode';
 import { CurveNode } from './CurveNode';
+import { InverterNode } from './InverterNode';
 import { LerpNode } from './LerpNode';
 import { RemapNode } from './RemapNode';
 import { SignalStrengthNode } from './SignalStrengthNode';
@@ -49,6 +50,8 @@ function cloneNode(node: INode, id = nextNodeId(node.type)) {
     const next = new LerpNode(id);
     next.factor = node.factor;
     clone = next;
+  } else if (node instanceof InverterNode) {
+    clone = new InverterNode(id);
   } else if (node instanceof ClampNode) {
     const next = new ClampNode(id);
     next.min = node.min;
@@ -108,6 +111,8 @@ function serializeNode(node: INode): SerializedNode {
     serialized.config = { multiplier: node.multiplier, offset: node.offset };
   } else if (node instanceof LerpNode) {
     serialized.config = { factor: node.factor };
+  } else if (node instanceof InverterNode) {
+    serialized.config = {};
   } else if (node instanceof ClampNode) {
     serialized.config = { min: node.min, max: node.max };
   } else if (node instanceof CurveNode) {
@@ -197,6 +202,9 @@ function deserializeNode(serialized: SerializedNode) {
       node = next;
       break;
     }
+    case 'InverterNode':
+      node = new InverterNode(id);
+      break;
     case 'ClampNode': {
       const next = new ClampNode(id);
       next.min = numberConfig(config, 'min', next.min);
