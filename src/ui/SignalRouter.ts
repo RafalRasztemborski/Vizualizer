@@ -1,8 +1,10 @@
 import { INode, IConnection, SignalValue } from './types';
 import { ClampNode } from './ClampNode';
+import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
 import { InverterNode } from './InverterNode';
 import { LerpNode } from './LerpNode';
+import { OffsetNode } from './OffsetNode';
 import { RemapNode } from './RemapNode';
 import { SignalStrengthNode } from './SignalStrengthNode';
 import {
@@ -52,6 +54,21 @@ function cloneNode(node: INode, id = nextNodeId(node.type)) {
     clone = next;
   } else if (node instanceof InverterNode) {
     clone = new InverterNode(id);
+  } else if (node instanceof OffsetNode) {
+    const next = new OffsetNode(id);
+    next.offset = node.offset;
+    next.returnOnSilence = node.returnOnSilence;
+    next.returnSpeed = node.returnSpeed;
+    clone = next;
+  } else if (node instanceof BounceNode) {
+    const next = new BounceNode(id);
+    next.attackSensitivity = node.attackSensitivity;
+    next.decaySensitivity = node.decaySensitivity;
+    next.minAmplitude = node.minAmplitude;
+    next.bounceDepth = node.bounceDepth;
+    next.bounceSpeed = node.bounceSpeed;
+    next.bounceCurve = node.bounceCurve;
+    clone = next;
   } else if (node instanceof ClampNode) {
     const next = new ClampNode(id);
     next.min = node.min;
@@ -113,6 +130,21 @@ function serializeNode(node: INode): SerializedNode {
     serialized.config = { factor: node.factor };
   } else if (node instanceof InverterNode) {
     serialized.config = {};
+  } else if (node instanceof OffsetNode) {
+    serialized.config = {
+      offset: node.offset,
+      returnOnSilence: node.returnOnSilence,
+      returnSpeed: node.returnSpeed,
+    };
+  } else if (node instanceof BounceNode) {
+    serialized.config = {
+      attackSensitivity: node.attackSensitivity,
+      decaySensitivity: node.decaySensitivity,
+      minAmplitude: node.minAmplitude,
+      bounceDepth: node.bounceDepth,
+      bounceSpeed: node.bounceSpeed,
+      bounceCurve: node.bounceCurve,
+    };
   } else if (node instanceof ClampNode) {
     serialized.config = { min: node.min, max: node.max };
   } else if (node instanceof CurveNode) {
@@ -205,6 +237,38 @@ function deserializeNode(serialized: SerializedNode) {
     case 'InverterNode':
       node = new InverterNode(id);
       break;
+    case 'OffsetNode': {
+      const next = new OffsetNode(id);
+      next.offset = numberConfig(config, 'offset', next.offset);
+      next.returnOnSilence = config?.returnOnSilence === true;
+      next.returnSpeed = numberConfig(config, 'returnSpeed', next.returnSpeed);
+      node = next;
+      break;
+    }
+    case 'BounceNode': {
+      const next = new BounceNode(id);
+      next.attackSensitivity = numberConfig(
+        config,
+        'attackSensitivity',
+        next.attackSensitivity,
+      );
+      next.decaySensitivity = numberConfig(
+        config,
+        'decaySensitivity',
+        next.decaySensitivity,
+      );
+      next.minAmplitude = numberConfig(
+        config,
+        'minAmplitude',
+        next.minAmplitude,
+      );
+      next.bounceDepth = numberConfig(config, 'bounceDepth', next.bounceDepth);
+      next.bounceSpeed = numberConfig(config, 'bounceSpeed', next.bounceSpeed);
+      const curve = stringConfig(config, 'bounceCurve', next.bounceCurve);
+      next.bounceCurve = curve === 'linear' ? 'linear' : 'exponential';
+      node = next;
+      break;
+    }
     case 'ClampNode': {
       const next = new ClampNode(id);
       next.min = numberConfig(config, 'min', next.min);

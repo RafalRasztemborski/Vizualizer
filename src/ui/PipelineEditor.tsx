@@ -7,8 +7,10 @@ import { SmoothingNode } from './SmoothingNode';
 import { SignalStrengthNode } from './SignalStrengthNode';
 import { LerpNode } from './LerpNode';
 import { ClampNode } from './ClampNode';
+import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
 import { InverterNode } from './InverterNode';
+import { OffsetNode } from './OffsetNode';
 import { RemapNode } from './RemapNode';
 import { WaveTransformNode } from './WaveTransformNode';
 import {
@@ -23,6 +25,8 @@ import {
 const PROCESSOR_OPTIONS = [
   { type: 'lerp', label: 'Lerp' },
   { type: 'inverter', label: 'Inverter' },
+  { type: 'offset', label: 'Zero Offset' },
+  { type: 'bounce', label: 'Bounce' },
   { type: 'smoothing', label: 'Smoothing' },
   { type: 'strength', label: 'Strength' },
   { type: 'clamp', label: 'Clamp' },
@@ -90,6 +94,12 @@ export const PipelineEditor = React.memo<{
           break;
         case 'inverter':
           node = new InverterNode(id);
+          break;
+        case 'offset':
+          node = new OffsetNode(id);
+          break;
+        case 'bounce':
+          node = new BounceNode(id);
           break;
         case 'clamp':
           node = new ClampNode(id);
@@ -686,6 +696,195 @@ const PipelineNodeCard = React.memo<{
             <span className="setting-label" style={{ fontSize: '9px' }}>
               Lerp Speed: {node.factor.toFixed(3)}
             </span>
+          </div>
+        )}
+
+        {node instanceof OffsetNode && (
+          <div className="node-settings">
+            <input
+              type="number"
+              className="compact-input"
+              step="0.0001"
+              value={node.offset}
+              onChange={(e) => {
+                node.offset = parseFloat(e.target.value) || 0;
+                onUpdate();
+              }}
+              style={{ width: '100%', fontSize: '9px', marginBottom: '4px' }}
+            />
+            <input
+              type="range"
+              min="-10"
+              max="10"
+              step="0.0001"
+              value={Math.max(-10, Math.min(10, node.offset))}
+              onChange={(e) => {
+                node.offset = parseFloat(e.target.value);
+                onUpdate();
+              }}
+            />
+            <span className="setting-label" style={{ fontSize: '9px' }}>
+              Zero at: {node.offset.toFixed(4)}
+            </span>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '9px',
+                marginTop: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={node.returnOnSilence}
+                onChange={(e) => {
+                  node.returnOnSilence = e.target.checked;
+                  onUpdate();
+                }}
+              />
+              Return to zero on silence
+            </label>
+            {node.returnOnSilence && (
+              <div style={{ display: 'flex', flexDirection: 'column', marginTop: '4px' }}>
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                  Return speed: {node.returnSpeed.toFixed(3)}
+                </span>
+                <input
+                  type="range"
+                  min="0.005"
+                  max="0.25"
+                  step="0.001"
+                  value={node.returnSpeed}
+                  onChange={(e) => {
+                    node.returnSpeed = parseFloat(e.target.value);
+                    onUpdate();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {node instanceof BounceNode && (
+          <div
+            className="node-settings"
+            style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
+          >
+            <span
+              style={{
+                fontSize: '8px',
+                color: '#39d2c0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}
+            >
+              Detection
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Attack sens: {node.attackSensitivity.toFixed(3)}
+              </span>
+              <input
+                type="range"
+                min="0.005"
+                max="0.15"
+                step="0.001"
+                value={node.attackSensitivity}
+                onChange={(e) => {
+                  node.attackSensitivity = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Decay sens: {node.decaySensitivity.toFixed(3)}
+              </span>
+              <input
+                type="range"
+                min="0.005"
+                max="0.15"
+                step="0.001"
+                value={node.decaySensitivity}
+                onChange={(e) => {
+                  node.decaySensitivity = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Min amplitude: {node.minAmplitude.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0.02"
+                max="0.8"
+                step="0.01"
+                value={node.minAmplitude}
+                onChange={(e) => {
+                  node.minAmplitude = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+
+            <span
+              style={{
+                fontSize: '8px',
+                color: '#39d2c0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginTop: '2px',
+              }}
+            >
+              Bounce
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Depth: {node.bounceDepth.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0.05"
+                max="1"
+                step="0.01"
+                value={node.bounceDepth}
+                onChange={(e) => {
+                  node.bounceDepth = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                Speed: {node.bounceSpeed.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min="0.02"
+                max="0.35"
+                step="0.01"
+                value={node.bounceSpeed}
+                onChange={(e) => {
+                  node.bounceSpeed = parseFloat(e.target.value);
+                  onUpdate();
+                }}
+              />
+            </div>
+            <select
+              className="compact-select"
+              value={node.bounceCurve}
+              onChange={(e) => {
+                node.bounceCurve = e.target.value as 'linear' | 'exponential';
+                onUpdate();
+              }}
+            >
+              <option value="linear">Curve: Linear</option>
+              <option value="exponential">Curve: Exponential</option>
+            </select>
           </div>
         )}
 
