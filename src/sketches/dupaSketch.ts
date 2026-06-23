@@ -74,7 +74,7 @@ const state: DupaState = {
   smoothedTopBottomSpectrum: [],
   smoothedFrontBackSpectrum: [],
 };
-const RENDER_SCALE = 1;
+const RENDER_SCALE = 1.0;
 
 function numberParam(params: SketchParams, key: string, fallback = 0) {
   const value = params[key];
@@ -693,7 +693,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0,
       max: 4,
       step: 0.1,
-      defaultValue: 1,
+      defaultValue: 1.3,
     },
     {
       key: 'edgeAlpha',
@@ -702,7 +702,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0,
       max: 255,
       step: 1,
-      defaultValue: 230,
+      defaultValue: 255,
     },
     {
       key: 'frontBackEdgeAlign',
@@ -830,6 +830,21 @@ export const dupaSketch: P5SketchModule = {
       max: 4,
       step: 0.01,
       defaultValue: 1,
+    },
+    {
+      key: 'archMasterLink',
+      label: 'Link Arch Strength',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      key: 'archMasterOffset',
+      label: 'Arch Master Offset',
+      type: 'number',
+      min: -10,
+      max: 10,
+      step: 0.01,
+      defaultValue: 0,
     },
     {
       key: 'sinDensity',
@@ -1876,6 +1891,7 @@ function drawTopBottomWalls({
           p,
           px + edgeAlign.top.x,
           py,
+          //warpedZ + edgeAlign.top.z,
           warpedZ + edgeAlign.top.z,
           xSize,
           ySize + sizeAdd,

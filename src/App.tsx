@@ -42,6 +42,33 @@ function wrapDegrees(value: number) {
   return ((value % 360) + 360) % 360;
 }
 
+const DUPA_ARCH_KEYS = [
+  'frontBackArch',
+  'leftRightArch',
+  'topBottomArch',
+] as const;
+
+type DupaArchBaselines = Record<(typeof DUPA_ARCH_KEYS)[number], number>;
+
+function dupaArchBaselinesFromParams(params: SketchParams): DupaArchBaselines {
+  return {
+    frontBackArch: Number(params.frontBackArch ?? 1.5),
+    leftRightArch: Number(params.leftRightArch ?? 0.5),
+    topBottomArch: Number(params.topBottomArch ?? 0.5),
+  };
+}
+
+function dupaArchValuesFromBaselines(
+  baselines: DupaArchBaselines,
+  offset: number,
+): Pick<SketchParams, (typeof DUPA_ARCH_KEYS)[number]> {
+  return {
+    frontBackArch: baselines.frontBackArch + offset,
+    leftRightArch: baselines.leftRightArch + offset,
+    topBottomArch: baselines.topBottomArch + offset,
+  };
+}
+
 export function App() {
   const [selectedSketchId, setSelectedSketchId] = useState(sketches[0].id);
   const selectedSketch = useMemo(
@@ -164,11 +191,13 @@ export function App() {
     signals: { ...EMPTY_SIGNALS },
     midi: {},
   });
+  const dupaArchBaselinesRef = useRef<DupaArchBaselines | null>(null);
 
   useEffect(() => {
     const nextParams = defaultParamsForSketch(selectedSketchId);
     setParams(nextParams);
     setRoutedParams({});
+    dupaArchBaselinesRef.current = null;
     runtimeRef.current = {
       ...runtimeRef.current,
       params: nextParams,
@@ -273,6 +302,81 @@ export function App() {
     [selectedSketch],
   );
 
+  const handleParamChange = useCallback(
+    (key: string, value: SketchParamValue) => {
+      if (selectedSketchId !== 'dupa') {
+        setParams((current) => ({ ...current, [key]: value }));
+        return;
+      }
+
+      if (key === 'archMasterLink') {
+        const enabled = Boolean(value);
+        if (enabled) {
+          setParams((current) => {
+            dupaArchBaselinesRef.current = dupaArchBaselinesFromParams(current);
+            return {
+              ...current,
+              archMasterLink: true,
+              archMasterOffset: 0,
+              ...dupaArchBaselinesRef.current,
+            };
+          });
+        } else {
+          dupaArchBaselinesRef.current = null;
+          setParams((current) => ({ ...current, archMasterLink: false }));
+        }
+        return;
+      }
+
+      if (key === 'archMasterOffset') {
+        const offset = Number(value);
+        setParams((current) => {
+          if (!current.archMasterLink) {
+            return { ...current, archMasterOffset: offset };
+          }
+
+          if (!dupaArchBaselinesRef.current) {
+            dupaArchBaselinesRef.current = dupaArchBaselinesFromParams(current);
+          }
+
+          return {
+            ...current,
+            archMasterOffset: offset,
+            ...dupaArchValuesFromBaselines(
+              dupaArchBaselinesRef.current,
+              offset,
+            ),
+          };
+        });
+        return;
+      }
+
+      if (
+        DUPA_ARCH_KEYS.includes(key as (typeof DUPA_ARCH_KEYS)[number]) &&
+        params.archMasterLink
+      ) {
+        const offset = Number(params.archMasterOffset ?? 0);
+        const nextValue = Number(value);
+        setParams((current) => {
+          if (!dupaArchBaselinesRef.current) {
+            dupaArchBaselinesRef.current = dupaArchBaselinesFromParams(current);
+          }
+
+          dupaArchBaselinesRef.current = {
+            ...dupaArchBaselinesRef.current,
+            [key]: nextValue - offset,
+          };
+
+          return { ...current, [key]: nextValue };
+        });
+        return;
+      }
+
+      setParams((current) => ({ ...current, [key]: value }));
+    },
+    [params.archMasterLink, params.archMasterOffset, selectedSketchId],
+  );
+
   return (
     <main className="appShell">
       <P5Canvas
@@ -344,9 +448,7 @@ export function App() {
           sketch={selectedSketch}
           params={params}
           routedParams={routedParams}
-          onChange={(key: string, value: SketchParamValue) => {
-            setParams((current) => ({ ...current, [key]: value }));
-          }}
+          onChange={handleParamChange}
         />
       </aside>
 

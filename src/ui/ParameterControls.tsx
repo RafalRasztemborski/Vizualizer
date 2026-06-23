@@ -1,5 +1,11 @@
 import type { P5SketchModule, SketchParams, SketchParamValue } from '../core/types';
 
+const LINKED_ARCH_KEYS = new Set([
+  'frontBackArch',
+  'leftRightArch',
+  'topBottomArch',
+]);
+
 type Props = {
   sketch: P5SketchModule;
   params: SketchParams;
@@ -59,8 +65,16 @@ export function ParameterControls({ sketch, params, routedParams, onChange }: Pr
               </span>
               <input
                 type="range"
-                min={definition.min}
-                max={definition.max}
+                min={
+                  params.archMasterLink && LINKED_ARCH_KEYS.has(definition.key)
+                    ? Math.min(definition.min, Number(value))
+                    : definition.min
+                }
+                max={
+                  params.archMasterLink && LINKED_ARCH_KEYS.has(definition.key)
+                    ? Math.max(definition.max, Number(value))
+                    : definition.max
+                }
                 step={definition.step}
                 value={Number(value)}
                 onChange={(event) => onChange(definition.key, Number(event.target.value))}
