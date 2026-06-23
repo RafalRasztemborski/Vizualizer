@@ -74,7 +74,7 @@ const state: DupaState = {
   smoothedTopBottomSpectrum: [],
   smoothedFrontBackSpectrum: [],
 };
-const RENDER_SCALE = 1;
+const RENDER_SCALE = 0.7;
 
 function numberParam(params: SketchParams, key: string, fallback = 0) {
   const value = params[key];
@@ -552,7 +552,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.57,
+      defaultValue: 0.39,
     },
     {
       key: 'spectrumSmLR',
@@ -561,7 +561,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.1,
+      defaultValue: 0.24,
     },
     {
       key: 'pulseSmTB',
@@ -570,7 +570,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.92,
+      defaultValue: 0.78,
     },
     {
       key: 'spectrumSmTB',
@@ -579,7 +579,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.41,
+      defaultValue: 0.37,
     },
     {
       key: 'pulseSmFB',
@@ -588,7 +588,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.5,
+      defaultValue: 0.78,
     },
     {
       key: 'spectrumSmFB',
@@ -597,7 +597,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.43,
+      defaultValue: 0.1,
     },
     // --- SEKCJA 5: KOLORY I ŚWIATŁO ---
     {

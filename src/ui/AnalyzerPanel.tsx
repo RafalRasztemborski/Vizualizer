@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import type { AnalyzerConfig, ReactiveSignals } from '../core/types';
-import { inferConfigControls } from '../audio/audioBands';
+import type { ReactiveSignals } from '../core/types';
+import type { AudioEngineConfig } from '../audio/AudioEngine';
+import { AUDIO_ENGINE_CONTROLS } from '../audio/AudioEngine';
 
 type Props = {
-  config: AnalyzerConfig;
+  config: AudioEngineConfig;
   signals: ReactiveSignals;
   fps: number;
-  onConfigChange: (key: string, value: number) => void;
+  onConfigChange: (key: keyof AudioEngineConfig, value: number) => void;
 };
 
 function fpsTone(fps: number) {
@@ -23,7 +24,7 @@ const SignalMeter = React.memo(
         <i
           style={{
             transform: `scaleX(${Math.max(0, Math.min(1, value))})`,
-            transition: 'none', // Wyłączenie animacji CSS dla wydajności przy 60FPS
+            transition: 'none',
           }}
         />
       </div>
@@ -34,57 +35,58 @@ const SignalMeter = React.memo(
 
 export const AnalyzerPanel = React.memo(
   ({ config, signals, fps, onConfigChange }: Props) => {
-    const [showControls, setShowControls] = useState(true);
     const [showSignals, setShowSignals] = useState(true);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+
+    const signalEntries = [
+      ['centroid', signals.centroid],
+      ['flux', signals.flux],
+      ['onset', signals.onset],
+      ['beatPhase', signals.beatPhase ?? 0],
+      ['band0', signals.band0],
+      ['band1', signals.band1],
+      ['band2', signals.band2],
+      ['band3', signals.band3],
+      ['band4', signals.band4],
+      ['band5', signals.band5],
+    ] as const;
 
     return (
       <section className="analyzerOverlay" aria-label="Audio analyzer">
-        <header className="analyzerTopBar">
-          <h2>Analyzer</h2>
-          <output className={`fpsReadout ${fpsTone(fps)}`}>
-            {Math.round(fps)}
-            <span>fps</span>
-          </output>
+        <header className="analyzerTopBar futuristic">
+          <h2>Futuristic Analyzer</h2>
+          <div className="topRight">
+            <div className={`fpsReadout ${fpsTone(fps)}`}>
+              <strong>{Math.round(fps)}</strong>
+              <span>FPS</span>
+            </div>
+            <div className="waveIndicator" aria-hidden>
+              <svg width="60" height="30" viewBox="0 0 60 30">
+                <path
+                  d="M0 20 Q15 5 30 20 T60 20"
+                  stroke="#6ff"
+                  strokeWidth="1.5"
+                  fill="none"
+                  opacity="0.6"
+                />
+              </svg>
+            </div>
+          </div>
         </header>
 
         <div className="analyzerSegments">
-          <section className="analyzerSegment">
+          <section className="analyzerSegment advancedSummary">
             <button
               className="segmentToggle"
               type="button"
-              aria-expanded={showControls}
-              onClick={() => setShowControls((current) => !current)}
+              onClick={() => setShowAdvanced(true)}
             >
-              <span>Sliders</span>
-              <b>{showControls ? 'Hide' : 'Show'}</b>
+              <span>Advanced Audio</span>
+              <b>Open</b>
             </button>
-
-            {showControls ? (
-              <div className="analyzerControlList">
-                {inferConfigControls(config).map((control) => (
-                  <label className="control compactControl" key={control.key}>
-                    <span>
-                      {control.label}
-                      <strong>
-                        {Number(config[control.key]).toFixed(
-                          control.step < 0.01 ? 3 : 2,
-                        )}
-                      </strong>
-                    </span>
-                    <input
-                      type="range"
-                      min={control.min}
-                      max={control.max}
-                      step={control.step}
-                      value={config[control.key]}
-                      onChange={(event) =>
-                        onConfigChange(control.key, Number(event.target.value))
-                      }
-                    />
-                  </label>
-                ))}
-              </div>
-            ) : null}
+            <div className="advancedHint">
+              Configure temporal smoothing, lookahead and onset detection.
+            </div>
           </section>
 
           <section className="analyzerSegment">
@@ -99,19 +101,61 @@ export const AnalyzerPanel = React.memo(
             </button>
 
             {showSignals ? (
-              <div className="meters compactMeters">
-                {Object.entries(signals)
-                  .filter(
-                    (entry): entry is [string, number] =>
-                      typeof entry[1] === 'number' && Number.isFinite(entry[1]),
-                  )
-                  .map(([key, value]) => (
-                    <SignalMeter key={key} label={key} value={value} />
-                  ))}
+              <div className="analyzerControlList">
+                {signalEntries.map(([label, value]) => (
+                  <SignalMeter key={label} label={label} value={value ?? 0} />
+                ))}
               </div>
             ) : null}
           </section>
         </div>
+
+        {showAdvanced ? (
+          <div className="advancedOverlay" role="dialog" aria-modal="true">
+            <div className="advancedDrawer">
+              <header className="advancedHeader">
+                <div>
+                  <h3>Advanced Audio Config</h3>
+                  <p>Tune temporal analyzer parameters here.</p>
+                </div>
+                <button
+                  className="segmentToggle"
+                  type="button"
+                  onClick={() => setShowAdvanced(false)}
+                >
+                  Close
+                </button>
+              </header>
+              <div className="analyzerControlList">
+                {Object.entries(config).map(([key, value]) => {
+                  const control =
+                    AUDIO_ENGINE_CONTROLS[key as keyof AudioEngineConfig];
+                  return (
+                    <label className="control compactControl" key={key}>
+                      <span>
+                        {control?.label ?? key}
+                        <strong>{Number(value).toFixed(3)}</strong>
+                      </span>
+                      <input
+                        type="range"
+                        min={control?.min ?? 0}
+                        max={control?.max ?? Number(value) * 2}
+                        step={control?.step ?? 0.01}
+                        value={value}
+                        onChange={(event) =>
+                          onConfigChange(
+                            key as keyof AudioEngineConfig,
+                            Number(event.target.value),
+                          )
+                        }
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
     );
   },
