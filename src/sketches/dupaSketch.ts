@@ -140,10 +140,12 @@ function clearWebglTrail(
     p.rect(-p.width, -p.height, p.width * 2, p.height * 2);
   }
 
+  p.pop();
+
   gl.enable(gl.DEPTH_TEST);
   gl.depthMask(true);
+  gl.clear(gl.DEPTH_BUFFER_BIT);
   p.perspective();
-  p.pop();
 }
 
 function sineFalloff(index: number, count: number) {
@@ -153,6 +155,32 @@ function sineFalloff(index: number, count: number) {
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
+}
+
+function signalNumber(
+  signals: RuntimeFrame['signals'],
+  key: 'bass' | 'mid' | 'high' | 'kickEnergy',
+  fallback = 0,
+) {
+  const value = signals[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function resetDupaRuntimeState() {
+  state.smoothedLeftRightPulse = 0;
+  state.smoothedTopBottomPulse = 0;
+  state.smoothedFrontBackPulse = 0;
+  state.smoothedLeftRightSpectrum = [];
+  state.smoothedTopBottomSpectrum = [];
+  state.smoothedFrontBackSpectrum = [];
+}
+
+function canvasSizeForHost(p: p5) {
+  const host = (p.canvas as HTMLCanvasElement | undefined)?.parentElement;
+  return {
+    width: Math.max(1, host?.clientWidth ?? p.windowWidth),
+    height: Math.max(1, host?.clientHeight ?? p.windowHeight),
+  };
 }
 
 function smoothstep01(value: number) {
@@ -872,10 +900,12 @@ export const dupaSketch: P5SketchModule = {
       powerPreference: 'high-performance' as any,
     });
 
-    // Skalowanie rozdzielczości (0.5 = 25% pikseli do przeliczenia)
+    resetDupaRuntimeState();
+
+    const { width, height } = canvasSizeForHost(p);
     const cnv = p.createCanvas(
-      p.windowWidth * RENDER_SCALE,
-      p.windowHeight * RENDER_SCALE,
+      width * RENDER_SCALE,
+      height * RENDER_SCALE,
       p.WEBGL,
     );
     p.pixelDensity(1);
@@ -884,12 +914,6 @@ export const dupaSketch: P5SketchModule = {
       TRAIL_VERTEX_SHADER,
       TRAIL_FRAGMENT_SHADER,
     );
-    state.smoothedLeftRightPulse = 0;
-    state.smoothedTopBottomPulse = 0;
-    state.smoothedFrontBackPulse = 0;
-    state.smoothedLeftRightSpectrum = [];
-    state.smoothedTopBottomSpectrum = [];
-    state.smoothedFrontBackSpectrum = [];
 
     // Wymuszenie skalowania CSS (100% zamiast vw/vh, aby nie zasłaniać UI)
     const canvasEl = (cnv as any).elt as HTMLCanvasElement;
@@ -899,21 +923,42 @@ export const dupaSketch: P5SketchModule = {
       canvasEl.style.imageRendering = 'pixelated'; // Zachowuje ostrość przy upscalingu
       canvasEl.style.transform = 'translateZ(0)'; // Wymusza oddzielną warstwę kompozytora
     }
+
+    p.perspective();
   },
   draw(frame) {
     drawDupa(frame);
   },
   windowResized(p) {
-    p.resizeCanvas(p.windowWidth * RENDER_SCALE, p.windowHeight * RENDER_SCALE);
+    const { width, height } = canvasSizeForHost(p);
+    p.resizeCanvas(width * RENDER_SCALE, height * RENDER_SCALE);
     const canvasEl = (p as any).canvas as HTMLCanvasElement;
     if (canvasEl) {
       canvasEl.style.width = '100%';
       canvasEl.style.height = '100%';
     }
+    p.perspective();
+  },
+  dispose() {
+    state.trailShader = undefined;
+    resetDupaRuntimeState();
   },
 };
 
 function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
+  const bass = signalNumber(signals, 'bass');
+  const mid = signalNumber(signals, 'mid');
+  const high = signalNumber(signals, 'high');
+  const kickEnergy = signalNumber(signals, 'kickEnergy');
+  const nyquist =
+    typeof signals.nyquist === 'number' && Number.isFinite(signals.nyquist)
+      ? signals.nyquist
+      : 22050;
+
+  if (!Number.isFinite(state.smoothedLeftRightPulse)) {
+    resetDupaRuntimeState();
+  }
+
   clearWebglTrail(
     p,
     Math.max(
@@ -983,12 +1028,12 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const ssFB = clamp01(routedNumber(params, routedParams, 'spectrumSmFB', 0.1));
 
   const targetSidePulse =
-    (signals.bass * 0.75 + signals.kickEnergy * 1.8) *
+    (bass * 0.75 + kickEnergy * 1.8) *
     routedNumber(params, routedParams, 'sidePulseMult', 1);
   const targetTopBottomPulse =
-    signals.mid * routedNumber(params, routedParams, 'topBottomPulseMult', 1);
+    mid * routedNumber(params, routedParams, 'topBottomPulseMult', 1);
   const targetFrontBackPulse =
-    signals.high * routedNumber(params, routedParams, 'frontBackPulseMult', 1);
+    high * routedNumber(params, routedParams, 'frontBackPulseMult', 1);
 
   // Aplikacja wygładzania dla impulsów
   state.smoothedLeftRightPulse +=
@@ -1023,7 +1068,6 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const spectrumTB = state.smoothedTopBottomSpectrum;
   const spectrumFB = state.smoothedFrontBackSpectrum;
 
-  const nyquist = signals.nyquist;
   const edgeWeight = Math.max(
     0,
     routedNumber(params, routedParams, 'edgeWeight', 1),
@@ -1034,18 +1078,18 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   p.rotateX(
     p.radians(routedNumber(params, routedParams, 'X_ROTATE', 0)) +
       autoRotX +
-      Math.sin(t * 0.4) * signals.high * 0.55,
+      Math.sin(t * 0.4) * high * 0.55,
   );
   p.rotateY(
     p.radians(routedNumber(params, routedParams, 'Y_ROTATE', 0)) +
       autoRotY +
-      Math.sin(t * 0.35) * signals.bass * 0.25,
+      Math.sin(t * 0.35) * bass * 0.25,
   );
   p.rotateZ(
     p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)) + autoRotZ,
   );
 
-  p.ambientLight(0, 0, 24 + signals.mid * 18);
+  p.ambientLight(0, 0, 24 + mid * 18);
   p.directionalLight(0, 0, 96, -0.35, 0.45, -1);
   p.pointLight(
     (routedNumber(params, routedParams, 'hue', 142) + 40) % 360,

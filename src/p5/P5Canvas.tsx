@@ -61,8 +61,13 @@ export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
     if (!hostRef.current) return;
 
     let previousMs = performance.now();
-    const instance = new p5((p) => {
-      p.setup = () => sketch.setup(p);
+    let resizeObserver: ResizeObserver | undefined;
+
+    const instanceRef = new p5((p) => {
+      p.setup = () => {
+        sketch.setup(p);
+        sketch.windowResized?.(p);
+      };
       p.draw = () => {
         const now = performance.now();
         const latest = runtimeRef.current;
@@ -80,11 +85,17 @@ export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
       p.windowResized = () => sketch.windowResized?.(p);
     }, hostRef.current);
 
+    resizeObserver = new ResizeObserver(() => {
+      sketch.windowResized?.(instanceRef);
+    });
+    resizeObserver.observe(hostRef.current);
+
     return () => {
+      resizeObserver?.disconnect();
       sketch.dispose?.();
-      instance.remove();
+      instanceRef.remove();
     };
-  }, [sketch]);
+  }, [sketch, runtimeRef]);
 
   return (
     <div

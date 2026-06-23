@@ -49,6 +49,12 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   band3: 0,
   band4: 0,
   band5: 0,
+  bass: 0,
+  mid: 0,
+  high: 0,
+  kickEnergy: 0,
+  detectedKick: 0,
+  nyquist: 22050,
 };
 
 export type AudioSourceKind = 'idle' | 'mic' | 'file';
@@ -155,7 +161,7 @@ export class AudioEngine {
 
   update(fps: number = 0): ReactiveSignals {
     if (!this.context || !this.analyser) {
-      return this.signals;
+      return { ...EMPTY_SIGNALS };
     }
 
     // Read time-domain samples and run the DSP pipeline
@@ -166,7 +172,7 @@ export class AudioEngine {
       !this.featureExtractor ||
       !this.temporalAnalyzer
     ) {
-      return this.signals;
+      return { ...EMPTY_SIGNALS };
     }
 
     this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
