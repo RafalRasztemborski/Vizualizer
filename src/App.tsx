@@ -7,7 +7,7 @@ import { AnalyzerPanel } from './ui/AnalyzerPanel';
 import { ParameterControls } from './ui/ParameterControls';
 import { SignalRouter } from './ui/SignalRouter';
 import { SignalRouterUI } from './ui/SignalRouterUI';
-import { Transport } from './ui/Transport';
+import { InputPanel } from './ui/InputPanel';
 import { collectChainSources } from './ui/chainSources';
 import { SourceNode } from './ui/SourceNode';
 import { TargetNode } from './ui/TargetNode';
@@ -283,7 +283,7 @@ export function App() {
   useEffect(() => () => audioRef.current.dispose(), []);
 
   const handleConfigChange = useCallback((key: string, value: number) => {
-    audioRef.current.setConfigValue(key, value);
+    audioRef.current.setConfigValue(key as any, value);
     setAudioVersion((version) => version + 1);
   }, []);
 
@@ -386,27 +386,35 @@ export function App() {
 
   return (
     <main className="appShell">
-      <P5Canvas
-        key={selectedSketch.id}
-        sketch={selectedSketch}
-        runtimeRef={runtimeRef}
-        onRotateDrag={
-          supportsDragRotate
-            ? (deltaX, deltaY) => {
-                const sensitivity = 0.35;
-                setParams((current) => ({
-                  ...current,
-                  X_ROTATE: wrapDegrees(
-                    Number(current.X_ROTATE ?? 0) + deltaY * sensitivity,
-                  ),
-                  Y_ROTATE: wrapDegrees(
-                    Number(current.Y_ROTATE ?? 0) + deltaX * sensitivity,
-                  ),
-                }));
-              }
-            : undefined
-        }
-      />
+      <div className="canvasContainer">
+        <P5Canvas
+          key={selectedSketch.id}
+          sketch={selectedSketch}
+          runtimeRef={runtimeRef}
+          onRotateDrag={
+            supportsDragRotate
+              ? (deltaX, deltaY) => {
+                  const sensitivity = 0.35;
+                  setParams((current) => ({
+                    ...current,
+                    X_ROTATE: wrapDegrees(
+                      Number(current.X_ROTATE ?? 0) + deltaY * sensitivity,
+                    ),
+                    Y_ROTATE: wrapDegrees(
+                      Number(current.Y_ROTATE ?? 0) + deltaX * sensitivity,
+                    ),
+                  }));
+                }
+              : undefined
+          }
+        />
+
+        <InputPanel
+          audioEngine={audioRef.current}
+          midiManager={midiRef.current}
+          onSourceChange={() => setAudioVersion((version) => version + 1)}
+        />
+      </div>
 
       <AnalyzerPanel
         config={audioRef.current.config}
@@ -432,24 +440,6 @@ export function App() {
             </select>
           </label>
         </section>
-
-        <Transport
-          sourceKind={audioRef.current.sourceKind}
-          audioElement={audioRef.current.element}
-          onMic={() => {
-            void audioRef.current
-              .useMicrophone()
-              .then(() => setAudioVersion((version) => version + 1));
-          }}
-          onMidi={() => {
-            void midiRef.current.connect();
-          }}
-          onFile={(file) => {
-            void audioRef.current
-              .useFile(file)
-              .then(() => setAudioVersion((version) => version + 1));
-          }}
-        />
 
         <ParameterControls
           sketch={selectedSketch}
