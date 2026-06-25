@@ -512,6 +512,25 @@ export const dupaSketch: P5SketchModule = {
       type: 'boolean',
       defaultValue: true,
     },
+    // HZ SLIDER 
+    {
+      key: 'Front&BackHZRangeMin',
+      label: 'Front and Back HZ range MIN',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 2500,
+    },
+    {
+      key: 'Front&BackHZRangeMax',
+      label: 'Front and Back HZ range MAX',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 12000,
+    },
     {
       key: 'showLeftWall',
       label: 'Left wall',
@@ -525,6 +544,24 @@ export const dupaSketch: P5SketchModule = {
       defaultValue: true,
     },
     {
+      key: 'Left&RightHZRangeMin',
+      label: 'Left and Right HZ range MIN',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 35,
+    },
+    {
+      key: 'Left&RightHZRangeMax',
+      label: 'Left and Right HZ range MAX',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 260,
+    },
+    {
       key: 'showTopWall',
       label: 'Top wall',
       type: 'boolean',
@@ -536,6 +573,24 @@ export const dupaSketch: P5SketchModule = {
       type: 'boolean',
       defaultValue: true,
     },
+    {
+      key: 'TopBottomHZRangeMin',
+      label: 'Top and Bottom HZ range MIN',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 260,
+    },
+    {
+      key: 'TopBottomHZRangeMax',
+      label: 'Top and Bottom HZ range MAX',
+      type: 'number',
+      min: 0,
+      max: 12000,
+      step: 1,
+      defaultValue: 2500,
+    },
     // --- SEKCJA 4: REAKTYWNOŚĆ AUDIO ---
     {
       key: 'audioDepth',
@@ -544,7 +599,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0,
       max: 500,
       step: 1,
-      defaultValue: 120,
+      defaultValue: 250,
     },
     {
       key: 'sidePulseMult',
@@ -598,7 +653,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.92,
+      defaultValue: 0.34,
     },
     {
       key: 'spectrumSmTB',
@@ -607,7 +662,7 @@ export const dupaSketch: P5SketchModule = {
       min: 0.001,
       max: 1,
       step: 0.001,
-      defaultValue: 0.41,
+      defaultValue: 0.10,
     },
     {
       key: 'pulseSmFB',
@@ -1077,13 +1132,13 @@ function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   p.translate(0, 0, routedNumber(params, routedParams, 'z_position', 0));
   p.rotateX(
     p.radians(routedNumber(params, routedParams, 'X_ROTATE', 0)) +
-      autoRotX +
-      Math.sin(t * 0.4) * high * 0.55,
+    autoRotX +
+    Math.sin(t * 0.4) * high * 0.55,
   );
   p.rotateY(
     p.radians(routedNumber(params, routedParams, 'Y_ROTATE', 0)) +
-      autoRotY +
-      Math.sin(t * 0.35) * bass * 0.25,
+    autoRotY +
+    Math.sin(t * 0.35) * bass * 0.25,
   );
   p.rotateZ(
     p.radians(routedNumber(params, routedParams, 'Z_ROTATE', 0)) + autoRotZ,
@@ -1224,8 +1279,8 @@ function drawFrontBackWalls({
         spectrumFB,
         nyquist,
         serpentinePosition(x, xRows, y, yRows),
-        2500,
-        12000,
+        routedNumber(params, routedParams, 'Front&BackHZRangeMin', 2500),
+        routedNumber(params, routedParams, 'Front&BackHZRangeMax', 12000),
       );
       const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
       const anim = falloff * energy * audioDepth;
@@ -1252,23 +1307,23 @@ function drawFrontBackWalls({
       );
       const edgeAlign = edgeAlignEnabled
         ? frontBackEdgeAlignment({
-            params,
-            routedParams,
-            x,
-            y,
-            xRows,
-            yRows,
-            zRows,
-            audioDepth,
-            sidePulse,
-            topBottomPulse,
-            spectrumLR,
-            spectrumTB,
-            spectrumFB,
-            nyquist,
-            amount: edgeAlignAmount,
-            radius: edgeAlignRadius,
-          })
+          params,
+          routedParams,
+          x,
+          y,
+          xRows,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          topBottomPulse,
+          spectrumLR,
+          spectrumTB,
+          spectrumFB,
+          nyquist,
+          amount: edgeAlignAmount,
+          radius: edgeAlignRadius,
+        })
         : { front: { x: 0, y: 0 }, back: { x: 0, y: 0 } };
 
       if (wallEnabled(params, 'front')) {
@@ -1369,67 +1424,71 @@ function frontBackEdgeAlignmentForZ({
 
   const topOffset = wallEnabled(params, 'top')
     ? wallEdgeOffset(
-        topBottomStrength,
-        'positive',
-        topBottomWallAnim(
-          x,
-          z,
-          xRows,
-          zRows,
-          audioDepth,
-          topBottomPulse,
-          spectrumTB,
-          nyquist,
-        ),
-      )
+      topBottomStrength,
+      'positive',
+      topBottomWallAnim(
+        x,
+        z,
+        xRows,
+        zRows,
+        audioDepth,
+        topBottomPulse,
+        spectrumTB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
   const bottomOffset = wallEnabled(params, 'bottom')
     ? wallEdgeOffset(
-        topBottomStrength,
-        'negative',
-        topBottomWallAnim(
-          x,
-          z,
-          xRows,
-          zRows,
-          audioDepth,
-          topBottomPulse,
-          spectrumTB,
-          nyquist,
-        ),
-      )
+      topBottomStrength,
+      'negative',
+      topBottomWallAnim(
+        x,
+        z,
+        xRows,
+        zRows,
+        audioDepth,
+        topBottomPulse,
+        spectrumTB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
   const leftOffset = wallEnabled(params, 'left')
     ? wallEdgeOffset(
-        leftRightStrength,
-        'negative',
-        sideWallAnim(
-          y,
-          z,
-          yRows,
-          zRows,
-          audioDepth,
-          sidePulse,
-          spectrumLR,
-          nyquist,
-        ),
-      )
+      leftRightStrength,
+      'negative',
+      sideWallAnim(
+        y,
+        z,
+        yRows,
+        zRows,
+        audioDepth,
+        sidePulse,
+        spectrumLR,
+        nyquist,
+      ),
+    )
     : 0;
   const rightOffset = wallEnabled(params, 'right')
     ? wallEdgeOffset(
-        leftRightStrength,
-        'positive',
-        sideWallAnim(
-          y,
-          z,
-          yRows,
-          zRows,
-          audioDepth,
-          sidePulse,
-          spectrumLR,
-          nyquist,
-        ),
-      )
+      leftRightStrength,
+      'positive',
+      sideWallAnim(
+        y,
+        z,
+        yRows,
+        zRows,
+        audioDepth,
+        sidePulse,
+        spectrumLR,
+        nyquist,
+      ),
+    )
     : 0;
 
   return {
@@ -1497,6 +1556,8 @@ function frontBackWallAnim(
   frontBackPulse: number,
   spectrum: number[],
   nyquist: number,
+  params: SketchParams,
+  routedParams: NumericRecord,
 ) {
   const fx = sineFalloff(x - 1, xRows - 2);
   const fy = sineFalloff(y - 1, yRows - 2);
@@ -1522,6 +1583,8 @@ function topBottomWallAnim(
   topBottomPulse: number,
   spectrum: number[],
   nyquist: number,
+  params: SketchParams,
+  routedParams: NumericRecord,
 ) {
   const fx = sineFalloff(x - 1, xRows - 2);
   const fz = sineFalloff(z - 1, zRows - 2);
@@ -1530,8 +1593,8 @@ function topBottomWallAnim(
     spectrum,
     nyquist,
     serpentinePosition(x, xRows, z, zRows),
-    260,
-    2500,
+    0, //routedNumber(params, routedParams, 'TopBottomHZRangeMin', 260),
+    0, //routedNumber(params, routedParams, 'TopBottomHZRangeMax', 2500),
   );
   const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
 
@@ -1562,7 +1625,7 @@ function sideWallAnim(
 
   return falloff * energy * audioDepth;
 }
-
+// TU
 function drawLeftRightWalls({
   p,
   params,
@@ -1611,8 +1674,8 @@ function drawLeftRightWalls({
         spectrumLR,
         nyquist,
         serpentinePosition(z, zRows, y, yRows),
-        35,
-        260,
+        routedNumber(params, routedParams, 'Left&RightHZRangeMin', 35),
+        routedNumber(params, routedParams, 'Left&RightHZRangeMax', 260),
       );
       const energy = spectralEnergy * 1.25 + sidePulse * 0.15;
       const anim = falloff * energy * audioDepth;
@@ -1641,24 +1704,24 @@ function drawLeftRightWalls({
 
       const edgeAlign = edgeAlignEnabled
         ? leftRightEdgeAlignment({
-            params,
-            routedParams,
-            xRows,
-            y,
-            z,
-            yRows,
-            zRows,
-            audioDepth,
-            sidePulse,
-            topBottomPulse,
-            frontBackPulse,
-            spectrumLR,
-            spectrumTB,
-            spectrumFB,
-            nyquist,
-            amount: edgeAlignAmount,
-            radius: edgeAlignRadius,
-          })
+          params,
+          routedParams,
+          xRows,
+          y,
+          z,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          topBottomPulse,
+          frontBackPulse,
+          spectrumLR,
+          spectrumTB,
+          spectrumFB,
+          nyquist,
+          amount: edgeAlignAmount,
+          radius: edgeAlignRadius,
+        })
         : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
@@ -1761,67 +1824,75 @@ function leftRightEdgeAlignmentForX({
 
   const topOffset = wallEnabled(params, 'top')
     ? wallEdgeOffset(
-        topBottomStrength,
-        'positive',
-        topBottomWallAnim(
-          x,
-          z,
-          xRows,
-          zRows,
-          audioDepth,
-          topBottomPulse,
-          spectrumTB,
-          nyquist,
-        ),
-      )
+      topBottomStrength,
+      'positive',
+      topBottomWallAnim(
+        x,
+        z,
+        xRows,
+        zRows,
+        audioDepth,
+        topBottomPulse,
+        spectrumTB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
   const bottomOffset = wallEnabled(params, 'bottom')
     ? wallEdgeOffset(
-        topBottomStrength,
-        'negative',
-        topBottomWallAnim(
-          x,
-          z,
-          xRows,
-          zRows,
-          audioDepth,
-          topBottomPulse,
-          spectrumTB,
-          nyquist,
-        ),
-      )
+      topBottomStrength,
+      'negative',
+      topBottomWallAnim(
+        x,
+        z,
+        xRows,
+        zRows,
+        audioDepth,
+        topBottomPulse,
+        spectrumTB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
   const frontOffset = wallEnabled(params, 'front')
     ? wallEdgeOffset(
-        frontBackStrength,
-        'negative',
-        frontBackWallAnim(
-          x,
-          y,
-          xRows,
-          yRows,
-          audioDepth,
-          frontBackPulse,
-          spectrumFB,
-          nyquist,
-        ),
-      )
+      frontBackStrength,
+      'negative',
+      frontBackWallAnim(
+        x,
+        y,
+        xRows,
+        yRows,
+        audioDepth,
+        frontBackPulse,
+        spectrumFB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
   const backOffset = wallEnabled(params, 'back')
     ? wallEdgeOffset(
-        frontBackStrength,
-        'positive',
-        frontBackWallAnim(
-          x,
-          y,
-          xRows,
-          yRows,
-          audioDepth,
-          frontBackPulse,
-          spectrumFB,
-          nyquist,
-        ),
-      )
+      frontBackStrength,
+      'positive',
+      frontBackWallAnim(
+        x,
+        y,
+        xRows,
+        yRows,
+        audioDepth,
+        frontBackPulse,
+        spectrumFB,
+        nyquist,
+        params,
+        routedParams,
+      ),
+    )
     : 0;
 
   return {
@@ -1878,8 +1949,8 @@ function drawTopBottomWalls({
         spectrumTB,
         nyquist,
         serpentinePosition(x, xRows, z, zRows),
-        260,
-        2500,
+        routedNumber(params, routedParams, 'TopBottomHZRangeMin', 260),
+        routedNumber(params, routedParams, 'TopBottomHZRangeMax', 2500),
       );
       const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
       const anim = falloff * energy * audioDepth;
@@ -1908,24 +1979,24 @@ function drawTopBottomWalls({
 
       const edgeAlign = edgeAlignEnabled
         ? topBottomEdgeAlignment({
-            params,
-            routedParams,
-            x,
-            z,
-            xRows,
-            yRows,
-            zRows,
-            audioDepth,
-            sidePulse,
-            topBottomPulse,
-            frontBackPulse,
-            spectrumLR,
-            spectrumTB,
-            spectrumFB,
-            nyquist,
-            amount: edgeAlignAmount,
-            radius: edgeAlignRadius,
-          })
+          params,
+          routedParams,
+          x,
+          z,
+          xRows,
+          yRows,
+          zRows,
+          audioDepth,
+          sidePulse,
+          topBottomPulse,
+          frontBackPulse,
+          spectrumLR,
+          spectrumTB,
+          spectrumFB,
+          nyquist,
+          amount: edgeAlignAmount,
+          radius: edgeAlignRadius,
+        })
         : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
@@ -2029,67 +2100,67 @@ function topBottomEdgeAlignmentForY({
 
   const leftOffset = wallEnabled(params, 'left')
     ? wallEdgeOffset(
-        leftRightStrength,
-        'negative',
-        sideWallAnim(
-          y,
-          z,
-          yRows,
-          zRows,
-          audioDepth,
-          sidePulse,
-          spectrumLR,
-          nyquist,
-        ),
-      )
+      leftRightStrength,
+      'negative',
+      sideWallAnim(
+        y,
+        z,
+        yRows,
+        zRows,
+        audioDepth,
+        sidePulse,
+        spectrumLR,
+        nyquist,
+      ),
+    )
     : 0;
   const rightOffset = wallEnabled(params, 'right')
     ? wallEdgeOffset(
-        leftRightStrength,
-        'positive',
-        sideWallAnim(
-          y,
-          z,
-          yRows,
-          zRows,
-          audioDepth,
-          sidePulse,
-          spectrumLR,
-          nyquist,
-        ),
-      )
+      leftRightStrength,
+      'positive',
+      sideWallAnim(
+        y,
+        z,
+        yRows,
+        zRows,
+        audioDepth,
+        sidePulse,
+        spectrumLR,
+        nyquist,
+      ),
+    )
     : 0;
   const frontOffset = wallEnabled(params, 'front')
     ? wallEdgeOffset(
-        frontBackStrength,
-        'negative',
-        frontBackWallAnim(
-          x,
-          y,
-          xRows,
-          yRows,
-          audioDepth,
-          frontBackPulse,
-          spectrumFB,
-          nyquist,
-        ),
-      )
+      frontBackStrength,
+      'negative',
+      frontBackWallAnim(
+        x,
+        y,
+        xRows,
+        yRows,
+        audioDepth,
+        frontBackPulse,
+        spectrumFB,
+        nyquist,
+      ),
+    )
     : 0;
   const backOffset = wallEnabled(params, 'back')
     ? wallEdgeOffset(
-        frontBackStrength,
-        'positive',
-        frontBackWallAnim(
-          x,
-          y,
-          xRows,
-          yRows,
-          audioDepth,
-          frontBackPulse,
-          spectrumFB,
-          nyquist,
-        ),
-      )
+      frontBackStrength,
+      'positive',
+      frontBackWallAnim(
+        x,
+        y,
+        xRows,
+        yRows,
+        audioDepth,
+        frontBackPulse,
+        spectrumFB,
+        nyquist,
+      ),
+    )
     : 0;
 
   return {
