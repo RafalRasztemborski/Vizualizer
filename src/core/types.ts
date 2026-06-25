@@ -14,18 +14,18 @@ export type ReactiveSignals = {
   band3: number;
   band4: number;
   band5: number;
-  // legacy fields kept optional for compatibility only
-  detectedKick?: number;
-  kick?: number;
-  bass?: number;
-  bassWithoutKick?: number;
-  cleanedBass?: number;
-  mid?: number;
-  high?: number;
-  kickEnergy?: number;
-  lastKickTime?: number;
-  nyquist?: number;
-  fps?: number;
+  // legacy fields kept for compatibility
+  detectedKick: number;
+  kick: number;
+  bass: number;
+  bassWithoutKick: number;
+  cleanedBass: number;
+  mid: number;
+  high: number;
+  kickEnergy: number;
+  lastKickTime: number;
+  nyquist: number;
+  fps: number;
 };
 
 export type AnalyzerConfig = NumericRecord;

@@ -73,7 +73,17 @@ input[type='range'] {
   grid-template-rows: 1fr auto;
 }
 
+.canvasContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .canvasHost {
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   background: #050809;
@@ -814,4 +824,353 @@ input[type='range'] {
     left: 100%;
     opacity: 0;
   }
+}
+
+/* Input Panel Overlay Styles */
+.inputOverlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  width: min(340px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(10, 20, 24, 0.68);
+  border: 1px solid rgba(57, 210, 192, 0.28);
+  box-shadow: 
+    0 16px 42px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 16px rgba(57, 210, 192, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #eef4f8;
+  font-family: inherit;
+}
+
+.inputOverlay:hover {
+  border-color: rgba(57, 210, 192, 0.55);
+  box-shadow: 
+    0 20px 48px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(57, 210, 192, 0.22);
+}
+
+.inputPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.inputPanelHeader h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #c8d5d8;
+  text-shadow: 0 0 8px rgba(200, 213, 216, 0.15);
+}
+
+.glow-dot {
+  width: 6px;
+  height: 6px;
+  background: #39d2c0;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #39d2c0;
+  display: inline-block;
+}
+
+/* Grid layout for sources */
+.inputSourceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.inputSourceBtn {
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 8px;
+  border: 1px solid rgba(238, 244, 248, 0.1);
+  background: rgba(20, 35, 38, 0.5);
+  color: #9fb0b3;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.inputSourceBtn .icon {
+  font-size: 14px;
+}
+
+.inputSourceBtn:hover {
+  background: rgba(57, 210, 192, 0.12);
+  border-color: rgba(57, 210, 192, 0.25);
+  color: #eef4f8;
+  box-shadow: 0 0 8px rgba(57, 210, 192, 0.1);
+}
+
+.inputSourceBtn.active {
+  background: rgba(57, 210, 192, 0.22);
+  border-color: #39d2c0;
+  color: #39d2c0;
+  box-shadow: 0 0 12px rgba(57, 210, 192, 0.2);
+}
+
+.fileBtnLabel input[type='file'] {
+  display: none;
+}
+
+.fileBtnLabel {
+  display: flex;
+}
+
+/* Player section and controls */
+.playerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(238, 244, 248, 0.08);
+}
+
+.playerControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.playBtn {
+  flex: 0 0 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(238, 244, 248, 0.12);
+  background: rgba(20, 35, 38, 0.6);
+  color: #eef4f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.playBtn:hover {
+  background: rgba(57, 210, 192, 0.2);
+  border-color: #39d2c0;
+  box-shadow: 0 0 12px rgba(57, 210, 192, 0.25);
+  transform: scale(1.05);
+}
+
+.playBtn.playing {
+  background: #39d2c0;
+  color: #071013;
+  border-color: #39d2c0;
+  box-shadow: 0 0 15px rgba(57, 210, 192, 0.4);
+}
+
+.specialPauseBtn {
+  flex: 1;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 184, 107, 0.2);
+  background: rgba(255, 184, 107, 0.08);
+  color: #ffb86b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.specialPauseBtn:hover {
+  background: rgba(255, 184, 107, 0.18);
+  border-color: rgba(255, 184, 107, 0.5);
+  box-shadow: 0 0 12px rgba(255, 184, 107, 0.15);
+}
+
+.specialPauseBtn.active {
+  background: rgba(255, 95, 87, 0.22);
+  border-color: #ff5f57;
+  color: #ff5f57;
+  box-shadow: 
+    0 0 16px rgba(255, 95, 87, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: pulse-border 2s infinite ease-in-out;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgba(255, 95, 87, 0.6);
+    box-shadow: 0 0 12px rgba(255, 95, 87, 0.25);
+  }
+  50% {
+    border-color: rgba(255, 95, 87, 1);
+    box-shadow: 0 0 20px rgba(255, 95, 87, 0.5);
+  }
+}
+
+/* Timeline & Slider customization */
+.timelineContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeDisplay {
+  font-size: 11px;
+  color: #9fb0b3;
+  font-variant-numeric: tabular-nums;
+  font-family: monospace;
+  text-align: right;
+  letter-spacing: 0.5px;
+}
+
+/* Custom Ranges */
+input[type="range"].modernSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+/* Fill effect updated via JS style --progress */
+input[type="range"].modernSlider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #39d2c0 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+}
+
+input[type="range"].modernSlider::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #39d2c0 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+}
+
+/* Thumb custom styling */
+input[type="range"].modernSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #39d2c0;
+  box-shadow: 0 0 6px rgba(57, 210, 192, 0.6);
+  cursor: pointer;
+  margin-top: -3px; /* Webkit alignment offset */
+  transition: all 0.15s ease;
+}
+
+input[type="range"].modernSlider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  background: #39d2c0;
+  box-shadow: 0 0 10px rgba(57, 210, 192, 1);
+}
+
+input[type="range"].modernSlider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #39d2c0;
+  box-shadow: 0 0 6px rgba(57, 210, 192, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+input[type="range"].modernSlider:hover::-moz-range-thumb {
+  transform: scale(1.2);
+  background: #39d2c0;
+  box-shadow: 0 0 10px rgba(57, 210, 192, 1);
+}
+
+/* Loop settings styling */
+.loopLengthSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 95, 87, 0.06);
+  border: 1px solid rgba(255, 95, 87, 0.12);
+  margin-top: 4px;
+  animation: slide-down 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loopLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #ff8b85;
+}
+
+.loopLabel strong {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* Specific loop slider track overrides */
+input[type="range"].modernSlider.loopSlider::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #ff5f57 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+}
+
+input[type="range"].modernSlider.loopSlider::-moz-range-track {
+  background: linear-gradient(to right, #ff5f57 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+}
+
+input[type="range"].modernSlider.loopSlider::-webkit-slider-thumb {
+  border-color: #ff5f57;
+  box-shadow: 0 0 6px rgba(255, 95, 87, 0.6);
+}
+
+input[type="range"].modernSlider.loopSlider:hover::-webkit-slider-thumb {
+  background: #ff5f57;
+  box-shadow: 0 0 10px rgba(255, 95, 87, 1);
+}
+
+input[type="range"].modernSlider.loopSlider::-moz-range-thumb {
+  border-color: #ff5f57;
+  box-shadow: 0 0 6px rgba(255, 95, 87, 0.6);
+}
+
+input[type="range"].modernSlider.loopSlider:hover::-moz-range-thumb {
+  background: #ff5f57;
+  box-shadow: 0 0 10px rgba(255, 95, 87, 1);
 }

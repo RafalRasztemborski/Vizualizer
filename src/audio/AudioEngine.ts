@@ -55,6 +55,11 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   kickEnergy: 0,
   detectedKick: 0,
   nyquist: 22050,
+  kick: 0,
+  bassWithoutKick: 0,
+  cleanedBass: 0,
+  lastKickTime: 0,
+  fps: 0,
 };
 
 export type AudioSourceKind = 'idle' | 'mic' | 'file';
@@ -73,6 +78,13 @@ export class AudioEngine {
   private timeDomainBuffer?: Float32Array;
   private audioElement = new Audio();
   private fileObjectUrl?: string;
+
+  // Special Pause state fields
+  private decodedBuffer: AudioBuffer | null = null;
+  private loopSource: AudioBufferSourceNode | null = null;
+  private specialPauseTime = 0;
+  isSpecialPause = false;
+  specialPauseLength = 1.0;
 
   config: AudioEngineConfig = { ...DEFAULT_AUDIO_ENGINE_CONFIG };
   sourceKind: AudioSourceKind = 'idle';
@@ -144,7 +156,9 @@ export class AudioEngine {
 
   async useFile(file: File) {
     await this.ensureContext();
+    this.stopSpecialPause(false);
     this.disconnectSource();
+    this.decodedBuffer = null;
 
     if (this.fileObjectUrl) {
       URL.revokeObjectURL(this.fileObjectUrl);
@@ -157,6 +171,93 @@ export class AudioEngine {
     this.source.connect(this.analyser!);
     this.analyser!.connect(this.context!.destination);
     this.sourceKind = 'file';
+
+    void this.decodeFile(file);
+  }
+
+  private async decodeFile(file: File) {
+    try {
+      await this.ensureContext();
+      const arrayBuffer = await file.arrayBuffer();
+      this.decodedBuffer = await this.context!.decodeAudioData(arrayBuffer);
+    } catch (err) {
+      console.error('Failed to decode audio file for Special Pause:', err);
+    }
+  }
+
+  startSpecialPause(loopLength: number, pauseElement = true) {
+    if (this.sourceKind !== 'file' || !this.decodedBuffer) return;
+
+    this.isSpecialPause = true;
+    this.specialPauseLength = loopLength;
+
+    if (pauseElement) {
+      this.specialPauseTime = this.audioElement.currentTime;
+      this.audioElement.pause();
+    }
+
+    if (this.loopSource) {
+      try {
+        this.loopSource.stop();
+      } catch (e) {}
+      this.loopSource.disconnect();
+      this.loopSource = null;
+    }
+
+    const duration = this.decodedBuffer.duration;
+    const end = Math.min(duration, this.specialPauseTime);
+    const start = Math.max(0, end - loopLength);
+
+    if (end - start < 0.01) {
+      return;
+    }
+
+    this.loopSource = this.context!.createBufferSource();
+    this.loopSource.buffer = this.decodedBuffer;
+    this.loopSource.loop = true;
+    this.loopSource.loopStart = start;
+    this.loopSource.loopEnd = end;
+
+    this.loopSource.connect(this.analyser!);
+    this.loopSource.start(0, start);
+  }
+
+  updateSpecialPauseLength(loopLength: number) {
+    this.specialPauseLength = loopLength;
+    if (!this.isSpecialPause) return;
+
+    if (this.loopSource && this.decodedBuffer) {
+      const duration = this.decodedBuffer.duration;
+      const end = Math.min(duration, this.specialPauseTime);
+      const start = Math.max(0, end - loopLength);
+      this.loopSource.loopStart = start;
+      this.loopSource.loopEnd = end;
+    }
+  }
+
+  stopSpecialPause(resumePlayback = true) {
+    if (!this.isSpecialPause) return;
+    this.isSpecialPause = false;
+
+    if (this.loopSource) {
+      try {
+        this.loopSource.stop();
+      } catch (e) {}
+      this.loopSource.disconnect();
+      this.loopSource = null;
+    }
+
+    if (resumePlayback && this.sourceKind === 'file') {
+      void this.audioElement.play();
+    }
+  }
+
+  seek(time: number) {
+    this.audioElement.currentTime = time;
+    if (this.isSpecialPause) {
+      this.specialPauseTime = time;
+      this.startSpecialPause(this.specialPauseLength, false);
+    }
   }
 
   update(fps: number = 0): ReactiveSignals {
@@ -175,7 +276,7 @@ export class AudioEngine {
       return { ...EMPTY_SIGNALS };
     }
 
-    this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
+    this.analyser.getFloatTimeDomainData(this.timeDomainBuffer as any);
 
     const mags = this.fftAnalyzer.computeMagnitudes(this.timeDomainBuffer);
     const bands = this.bandAnalyzer.computeBandEnergies(mags);
@@ -218,6 +319,10 @@ export class AudioEngine {
       kickEnergy: state.onset * 2,
       detectedKick: state.onset ? 1 : 0,
       nyquist: this.context.sampleRate, // / 2,
+      kick: state.onset ? 1 : 0,
+      bassWithoutKick: legacyBass,
+      cleanedBass: legacyBass,
+      lastKickTime: 0,
       fps,
     };
 
@@ -239,6 +344,7 @@ export class AudioEngine {
   }
 
   stop() {
+    this.stopSpecialPause(false);
     this.disconnectSource();
     this.sourceKind = 'idle';
   }
@@ -252,6 +358,7 @@ export class AudioEngine {
   }
 
   private disconnectSource() {
+    this.stopSpecialPause(false);
     this.source?.disconnect();
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = undefined;

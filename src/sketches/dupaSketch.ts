@@ -176,7 +176,7 @@ function resetDupaRuntimeState() {
 }
 
 function canvasSizeForHost(p: p5) {
-  const host = (p.canvas as HTMLCanvasElement | undefined)?.parentElement;
+  const host = ((p as any).canvas as HTMLCanvasElement | undefined)?.parentElement;
   return {
     width: Math.max(1, host?.clientWidth ?? p.windowWidth),
     height: Math.max(1, host?.clientHeight ?? p.windowHeight),

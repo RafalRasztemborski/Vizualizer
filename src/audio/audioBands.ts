@@ -26,7 +26,7 @@ export const EMPTY_SIGNALS: ReactiveSignals = {
   nyquist: 22050,
   fps: 0,
   dataArray: [],
-};
+} as any;
 
 export function inferConfigControls(config: AnalyzerConfig) {
   return Object.entries(config).map(([key, value]) => {
@@ -159,5 +159,5 @@ export function processAudioBands(
     nyquist: maxFreq,
     fps,
     dataArray: normalizedDataArray,
-  };
+  } as any;
 }
