@@ -6,6 +6,7 @@ import {
   TRAIL_VERTEX_SHADER,
 } from './shaders';
 import { RENDER_SCALE, resetDupaRuntimeState, state } from './state';
+import { InstancedRenderer } from './rendering/InstancedRenderer';
 import {
   boolParam,
   canvasSizeForHost,
@@ -42,6 +43,7 @@ export const dupaSketch: P5SketchModule = {
       TRAIL_VERTEX_SHADER,
       TRAIL_FRAGMENT_SHADER,
     );
+    state.instancedRenderer = createInstancedRenderer(p);
 
     // Wymuszenie skalowania CSS (100% zamiast vw/vh, aby nie zasłaniać UI)
     const canvasEl = (cnv as any).elt as HTMLCanvasElement;
@@ -69,9 +71,24 @@ export const dupaSketch: P5SketchModule = {
   },
   dispose() {
     state.trailShader = undefined;
+    state.instancedRenderer?.dispose();
+    state.instancedRenderer = undefined;
     resetDupaRuntimeState();
   },
 };
+
+function createInstancedRenderer(p: RuntimeFrame['p']) {
+  const gl = p.drawingContext;
+  if (
+    typeof WebGL2RenderingContext === 'undefined' ||
+    !(gl instanceof WebGL2RenderingContext)
+  ) {
+    console.warn('MOFOCube instanced renderer requires WebGL2.');
+    return undefined;
+  }
+
+  return new InstancedRenderer(gl);
+}
 
 export function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFrame) {
   const bass = signalNumber(signals, 'bass');
@@ -232,6 +249,7 @@ export function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFr
     p.noStroke();
   }
 
+  state.instancedRenderer?.beginFrame();
   drawWalls({
     p,
     params,
@@ -258,7 +276,13 @@ export function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFr
     nyquist,
     timeMs,
   });
+  try {
+    state.instancedRenderer?.endFrame(p);
+  } catch (error) {
+    console.warn('MOFOCube instanced renderer failed, falling back to p.box().', error);
+    state.instancedRenderer?.dispose();
+    state.instancedRenderer = undefined;
+  }
 
   p.pop();
 }
-

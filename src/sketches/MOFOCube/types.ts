@@ -1,5 +1,6 @@
 import type p5 from 'p5';
 import type { NumericRecord, SketchParams } from '../../core/types';
+import type { InstancedRenderer } from './rendering/InstancedRenderer';
 
 export type WallName = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
 
@@ -13,6 +14,7 @@ export type BoxColor = {
 
 export type DupaState = {
   trailShader?: p5.Shader;
+  instancedRenderer?: InstancedRenderer;
   smoothedLeftRightPulse: number;
   smoothedTopBottomPulse: number;
   smoothedFrontBackPulse: number;

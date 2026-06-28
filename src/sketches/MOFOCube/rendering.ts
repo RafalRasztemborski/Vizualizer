@@ -1,6 +1,7 @@
 import type p5 from 'p5';
 import type { NumericRecord, SketchParams } from '../../core/types';
 import { boolParam, routedNumber } from './helpers';
+import { state } from './state';
 import type { BoxColor, WallName } from './types';
 
 export function drawBox(
@@ -13,6 +14,11 @@ export function drawBox(
   sz: number,
   color: BoxColor,
 ) {
+  if (state.instancedRenderer) {
+    state.instancedRenderer.addInstance(x, y, z, sx, sy, sz, color);
+    return;
+  }
+
   p.push();
   p.translate(x, y, z);
   if (color.edgeAlpha > 0) {
@@ -91,4 +97,3 @@ export function colorForBox(
     edgeAlpha,
   };
 }
-
