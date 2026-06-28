@@ -13,9 +13,15 @@ type Props = {
   sketch: P5SketchModule;
   runtimeRef: MutableRefObject<P5RuntimeState>;
   onRotateDrag?: (deltaX: number, deltaY: number) => void;
+  onFrameRate?: (fps: number) => void;
 };
 
-export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
+export function P5Canvas({
+  sketch,
+  runtimeRef,
+  onRotateDrag,
+  onFrameRate,
+}: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -61,6 +67,8 @@ export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
     if (!hostRef.current) return;
 
     let previousMs = performance.now();
+    let frameCount = 0;
+    let lastFpsSampleMs = previousMs;
     let resizeObserver: ResizeObserver | undefined;
 
     const instanceRef = new p5((p) => {
@@ -80,6 +88,12 @@ export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
           deltaMs: now - previousMs,
           timeMs: now,
         });
+        frameCount += 1;
+        if (now - lastFpsSampleMs >= 500) {
+          onFrameRate?.((frameCount * 1000) / (now - lastFpsSampleMs));
+          frameCount = 0;
+          lastFpsSampleMs = now;
+        }
         previousMs = now;
       };
       p.windowResized = () => sketch.windowResized?.(p);
@@ -95,7 +109,7 @@ export function P5Canvas({ sketch, runtimeRef, onRotateDrag }: Props) {
       sketch.dispose?.();
       instanceRef.remove();
     };
-  }, [sketch, runtimeRef]);
+  }, [sketch, runtimeRef, onFrameRate]);
 
   return (
     <div
