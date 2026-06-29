@@ -876,6 +876,63 @@ input[type='range'] {
   border-color: rgba(255, 184, 107, 0.45);
 }
 
+.metadata-node-settings {
+  display: grid;
+  gap: 7px;
+  min-width: 160px;
+}
+
+.metadata-control,
+.metadata-toggle {
+  display: grid;
+  gap: 3px;
+}
+
+.metadata-control span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #b9d8dc;
+  font-size: 8px;
+}
+
+.metadata-control b {
+  color: #f2fbfc;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.metadata-control input[type='range'] {
+  height: 16px;
+  accent-color: #7c5cff;
+}
+
+.metadata-control-knob input[type='range'] {
+  accent-color: #ffb84d;
+}
+
+.metadata-toggle {
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  min-height: 22px;
+  padding: 0 5px;
+  border: 1px solid rgba(238, 244, 248, 0.1);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.metadata-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: #ffb84d;
+}
+
+.metadata-toggle span {
+  color: #c8d5d8;
+  font-size: 8px;
+}
+
 .pipeline-track::-webkit-scrollbar {
   height: 6px;
 }

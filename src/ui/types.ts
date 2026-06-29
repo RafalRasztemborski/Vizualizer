@@ -20,12 +20,31 @@ export interface IConnection {
   toPortId: string;
 }
 
+export type NodeControlKind = 'knob' | 'slider' | 'toggle' | 'dropdown';
+
+export type NodeControlOption = {
+  label: string;
+  value: string | number | boolean;
+};
+
+export type NodeControlDefinition = {
+  key: string;
+  label: string;
+  kind: NodeControlKind;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: NodeControlOption[];
+  description?: string;
+};
+
 export interface INode {
   id: string;
   name: string;
   type: string;
   inputs: Record<string, IPort>;
   outputs: Record<string, IPort>;
+  controls?: NodeControlDefinition[];
 
   /**
    * Główna logika transformacji sygnału.
