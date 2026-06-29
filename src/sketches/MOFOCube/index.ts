@@ -277,7 +277,7 @@ export function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFr
     timeMs,
   });
   try {
-    state.instancedRenderer?.endFrame(p);
+    state.instancedRenderer?.endFrame(p, edgeWeight);
   } catch (error) {
     console.warn('MOFOCube instanced renderer failed, falling back to p.box().', error);
     state.instancedRenderer?.dispose();

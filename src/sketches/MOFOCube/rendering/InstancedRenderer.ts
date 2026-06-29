@@ -13,6 +13,7 @@ type AttributeLocations = {
   instancePosition: number;
   instanceScale: number;
   instanceColor: number;
+  instanceEdgeAlpha: number;
 };
 
 export class InstancedRenderer {
@@ -23,12 +24,11 @@ export class InstancedRenderer {
   private readonly vao: WebGLVertexArrayObject;
   private readonly instanceBuffer: WebGLBuffer;
   private readonly modelViewMatrix = new Float32Array(16);
-  private readonly normalMatrix = new Float32Array(9);
   private readonly attributes: AttributeLocations;
   private readonly uniforms: {
     projectionMatrix: WebGLUniformLocation;
     modelViewMatrix: WebGLUniformLocation;
-    normalMatrix: WebGLUniformLocation;
+    edgeWeightPx: WebGLUniformLocation;
   };
 
   constructor(gl: WebGL2RenderingContext) {
@@ -41,11 +41,12 @@ export class InstancedRenderer {
       instancePosition: gl.getAttribLocation(this.program, 'aInstancePosition'),
       instanceScale: gl.getAttribLocation(this.program, 'aInstanceScale'),
       instanceColor: gl.getAttribLocation(this.program, 'aInstanceColor'),
+      instanceEdgeAlpha: gl.getAttribLocation(this.program, 'aInstanceEdgeAlpha'),
     };
     this.uniforms = {
       projectionMatrix: requireUniform(gl, this.program, 'uProjectionMatrix'),
       modelViewMatrix: requireUniform(gl, this.program, 'uModelViewMatrix'),
-      normalMatrix: requireUniform(gl, this.program, 'uNormalMatrix'),
+      edgeWeightPx: requireUniform(gl, this.program, 'uEdgeWeightPx'),
     };
 
     const vao = gl.createVertexArray();
@@ -75,14 +76,10 @@ export class InstancedRenderer {
     this.instances.add(x, y, z, sx, sy, sz, color);
   }
 
-  endFrame(p: p5) {
+  endFrame(p: p5, edgeWeightPx: number) {
     if (this.instances.count <= 0) return;
 
-    const matrices = getP5Matrices(
-      p,
-      this.modelViewMatrix,
-      this.normalMatrix,
-    );
+    const matrices = getP5Matrices(p, this.modelViewMatrix);
     const gl = this.gl;
     const previousProgram = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
     const previousVertexArray = gl.getParameter(gl.VERTEX_ARRAY_BINDING) as WebGLVertexArrayObject | null;
@@ -96,7 +93,7 @@ export class InstancedRenderer {
 
     gl.uniformMatrix4fv(this.uniforms.projectionMatrix, false, matrices.projection);
     gl.uniformMatrix4fv(this.uniforms.modelViewMatrix, false, matrices.modelView);
-    gl.uniformMatrix3fv(this.uniforms.normalMatrix, false, matrices.normal);
+    gl.uniform1f(this.uniforms.edgeWeightPx, Math.max(0, edgeWeightPx));
 
     gl.enable(gl.DEPTH_TEST);
     gl.drawElementsInstanced(
@@ -162,6 +159,13 @@ export class InstancedRenderer {
       4,
       stride,
       6 * Float32Array.BYTES_PER_ELEMENT,
+    );
+    configureInstanceAttribute(
+      gl,
+      this.attributes.instanceEdgeAlpha,
+      1,
+      stride,
+      10 * Float32Array.BYTES_PER_ELEMENT,
     );
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.mesh.indexBuffer);
@@ -245,16 +249,14 @@ function requireUniform(
 function getP5Matrices(
   p: p5,
   modelViewOut: Float32Array,
-  normalOut: Float32Array,
 ) {
   const renderer = (p as any)._renderer;
   const model = matrixData(renderer?.uModelMatrix);
   const view = matrixData(renderer?.uViewMatrix);
   const projection = matrixData(renderer?.uPMatrix);
   multiplyP5Matrices(modelViewOut, model, view);
-  normalMatrixFromModelView(normalOut, modelViewOut);
 
-  return { projection, modelView: modelViewOut, normal: normalOut };
+  return { projection, modelView: modelViewOut };
 }
 
 function matrixData(matrix: unknown) {
@@ -303,19 +305,4 @@ function multiplyP5Matrices(
   out[13] = b0 * right[1] + b1 * right[5] + b2 * right[9] + b3 * right[13];
   out[14] = b0 * right[2] + b1 * right[6] + b2 * right[10] + b3 * right[14];
   out[15] = b0 * right[3] + b1 * right[7] + b2 * right[11] + b3 * right[15];
-}
-
-function normalMatrixFromModelView(
-  out: Float32Array,
-  modelView: Float32Array,
-) {
-  out[0] = modelView[0];
-  out[1] = modelView[1];
-  out[2] = modelView[2];
-  out[3] = modelView[4];
-  out[4] = modelView[5];
-  out[5] = modelView[6];
-  out[6] = modelView[8];
-  out[7] = modelView[9];
-  out[8] = modelView[10];
 }
