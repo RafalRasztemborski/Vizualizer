@@ -1,4 +1,10 @@
-import { MutableRefObject, useEffect, useRef, type PointerEvent } from 'react';
+import {
+  MutableRefObject,
+  useEffect,
+  useRef,
+  type PointerEvent,
+  type WheelEvent,
+} from 'react';
 import p5 from 'p5';
 import type { NumericRecord, P5SketchModule, ReactiveSignals, SketchParams } from '../core/types';
 
@@ -13,6 +19,7 @@ type Props = {
   sketch: P5SketchModule;
   runtimeRef: MutableRefObject<P5RuntimeState>;
   onRotateDrag?: (deltaX: number, deltaY: number) => void;
+  onZoomWheel?: (deltaY: number) => void;
   onFrameRate?: (fps: number) => void;
 };
 
@@ -20,6 +27,7 @@ export function P5Canvas({
   sketch,
   runtimeRef,
   onRotateDrag,
+  onZoomWheel,
   onFrameRate,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -61,6 +69,12 @@ export function P5Canvas({
 
     dragRef.current = null;
     event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (!onZoomWheel) return;
+    event.preventDefault();
+    onZoomWheel(event.deltaY);
   };
 
   useEffect(() => {
@@ -119,6 +133,7 @@ export function P5Canvas({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
+      onWheel={handleWheel}
     />
   );
 }

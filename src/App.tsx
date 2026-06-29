@@ -21,9 +21,15 @@ import { PipelineEditor } from './ui/PipelineEditor';
 import type {
   NumericRecord,
   ReactiveSignals,
+  SketchParamDefinition,
   SketchParams,
   SketchParamValue,
 } from './core/types';
+
+type NumericSketchParamDefinition = Extract<
+  SketchParamDefinition,
+  { type: 'number' }
+>;
 
 const MIDI_SOURCE_KEYS = Array.from(
   { length: 128 },
@@ -47,6 +53,10 @@ function defaultParamsForSketch(sketchId: string): SketchParams {
 
 function wrapDegrees(value: number) {
   return ((value % 360) + 360) % 360;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 const DUPA_ARCH_KEYS = [
@@ -325,6 +335,14 @@ export function App() {
       selectedSketch.params.some((param) => param.key === 'Y_ROTATE'),
     [selectedSketch],
   );
+  const zoomParam = useMemo<NumericSketchParamDefinition | undefined>(
+    () =>
+      selectedSketch.params.find(
+        (param): param is NumericSketchParamDefinition =>
+          param.type === 'number' && param.key === 'z_position',
+      ),
+    [selectedSketch],
+  );
 
   const handleParamChange = useCallback(
     (key: string, value: SketchParamValue) => {
@@ -409,6 +427,26 @@ export function App() {
           sketch={selectedSketch}
           runtimeRef={runtimeRef}
           onFrameRate={handleCanvasFrameRate}
+          onZoomWheel={
+            zoomParam
+              ? (deltaY) => {
+                  const sensitivity = 1.6;
+                  setParams((current) => {
+                    const currentZ = Number(
+                      current.z_position ?? zoomParam.defaultValue,
+                    );
+                    return {
+                      ...current,
+                      z_position: clampNumber(
+                        currentZ - deltaY * sensitivity,
+                        zoomParam.min,
+                        zoomParam.max,
+                      ),
+                    };
+                  });
+                }
+              : undefined
+          }
           onRotateDrag={
             supportsDragRotate
               ? (deltaX, deltaY) => {
