@@ -64,6 +64,88 @@ input[type='range'] {
   accent-color: #39d2c0;
 }
 
+.paramControl {
+  --base-progress: 0%;
+  --automation-progress: 0%;
+}
+
+.paramControl.is-automated span {
+  color: #ffd6fb;
+}
+
+.paramControl.is-automated strong {
+  color: #ff7ce5;
+}
+
+.paramSliderWrap {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.paramSliderWrap::before,
+.paramSliderWrap::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.paramSliderWrap::before {
+  left: min(var(--base-progress), var(--automation-progress));
+  right: calc(100% - max(var(--base-progress), var(--automation-progress)));
+  top: 50%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff3fd4, #ffe45c);
+  box-shadow: 0 0 16px rgba(255, 63, 212, 0.3);
+  transform: translateY(-50%);
+}
+
+.paramSliderWrap::after {
+  left: var(--automation-progress);
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffe45c;
+  border-radius: 999px;
+  background: #ff3fd4;
+  box-shadow:
+    0 0 0 4px rgba(255, 63, 212, 0.18),
+    0 0 22px rgba(255, 63, 212, 0.62);
+  transform: translate(-50%, -50%);
+}
+
+.paramControl.is-automated .paramSliderWrap::before,
+.paramControl.is-automated .paramSliderWrap::after {
+  opacity: 1;
+}
+
+.paramControl.is-changing .paramSliderWrap::after {
+  animation: automationThumbPulse 0.36s ease-out;
+}
+
+.paramControl.is-changing input[type='range'] {
+  filter: drop-shadow(0 0 8px rgba(255, 63, 212, 0.7));
+}
+
+.paramControl.is-automated input[type='range'] {
+  accent-color: #ff3fd4;
+}
+
+@keyframes automationThumbPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1.22);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 .appShell {
   position: relative;
   width: 100vw;
