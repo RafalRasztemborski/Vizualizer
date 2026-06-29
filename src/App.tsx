@@ -4,6 +4,12 @@ import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
 import { sketches } from './sketches/registry';
 import { AnalyzerPanel } from './ui/AnalyzerPanel';
+import {
+  AUDIO_MOTION_SIGNAL_KEYS,
+  AudioMotionDebugPanel,
+  EMPTY_AUDIO_MOTION_SIGNALS,
+  type AudioMotionMonitorSignals,
+} from './ui/AudioMotionDebugPanel';
 import { ParameterControls } from './ui/ParameterControls';
 import { SignalRouter } from './ui/SignalRouter';
 import { SignalRouterUI } from './ui/SignalRouterUI';
@@ -181,6 +187,9 @@ export function App() {
   const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
+  const audioMotionSignalsRef = useRef<AudioMotionMonitorSignals>({
+    ...EMPTY_AUDIO_MOTION_SIGNALS,
+  });
   const midiRef = useRef(new MidiManager());
   const runtimeRef = useRef<P5RuntimeState>({
     params: initialParams,
@@ -215,7 +224,11 @@ export function App() {
     const tick = () => {
       const nextSignals = audioRef.current.update();
       const nextMidi = midiRef.current.currentValues;
-      const baseSources = { ...numericSignals(nextSignals), ...nextMidi };
+      const baseSources = {
+        ...numericSignals(nextSignals),
+        ...audioMotionSignalsRef.current,
+        ...nextMidi,
+      };
       const chainSources: NumericRecord = {};
       const nextRouted: NumericRecord = {};
 
@@ -277,12 +290,26 @@ export function App() {
     setFps(nextFps);
   }, []);
 
+  const handleAudioMotionSignals = useCallback(
+    (nextSignals: AudioMotionMonitorSignals) => {
+      audioMotionSignalsRef.current = nextSignals;
+    },
+    [],
+  );
+
   const sourceKeys = useMemo(() => {
     const signalKeys = Object.keys(numericSignals(signals)).sort();
     const extraMidiKeys = Object.keys(midi)
       .filter((key) => !/^cc\d+$/.test(key))
       .sort();
-    return [...new Set([...signalKeys, ...MIDI_SOURCE_KEYS, ...extraMidiKeys])];
+    return [
+      ...new Set([
+        ...signalKeys,
+        ...AUDIO_MOTION_SIGNAL_KEYS,
+        ...MIDI_SOURCE_KEYS,
+        ...extraMidiKeys,
+      ]),
+    ];
   }, [signals, midi]);
 
   const targetKeys = useMemo(
@@ -412,6 +439,13 @@ export function App() {
         signals={signals}
         fps={fps}
         onConfigChange={handleConfigChange}
+      />
+
+      <AudioMotionDebugPanel
+        audioEngine={audioRef.current}
+        signals={signals}
+        version={audioVersion}
+        onMonitorSignals={handleAudioMotionSignals}
       />
 
       <aside className="sidebar">
