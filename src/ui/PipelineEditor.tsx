@@ -11,6 +11,7 @@ import { LerpNode } from './LerpNode';
 import { ClampNode } from './ClampNode';
 import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
+import { GateNode } from './GateNode';
 import { InverterNode } from './InverterNode';
 import { OffsetNode } from './OffsetNode';
 import { PeakHoldDecayNode } from './PeakHoldDecayNode';
@@ -32,6 +33,7 @@ const PROCESSOR_OPTIONS = [
   { type: 'bounce', label: 'Bounce' },
   { type: 'smoothing', label: 'Smoothing' },
   { type: 'strength', label: 'Strength' },
+  { type: 'gate', label: 'Gate' },
   { type: 'clamp', label: 'Clamp' },
   { type: 'curve', label: 'Curve' },
   { type: 'remap', label: 'Remap' },
@@ -95,6 +97,9 @@ export const PipelineEditor = React.memo<{
         case 'strength':
           node = new SignalStrengthNode(id);
           break;
+        case 'gate':
+          node = new GateNode(id);
+          break;
         case 'lerp':
           node = new LerpNode(id);
           break;
@@ -146,9 +151,7 @@ export const PipelineEditor = React.memo<{
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `signal-router-${new Date()
-        .toISOString()
-        .replace(/[:.]/g, '-')}.json`;
+      link.download = 'kick&snare.json';
       link.click();
       URL.revokeObjectURL(url);
     };

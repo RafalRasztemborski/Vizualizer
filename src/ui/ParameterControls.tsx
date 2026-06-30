@@ -25,6 +25,8 @@ type Props = {
   onChange: (key: string, value: SketchParamValue) => void;
 };
 
+type ParamsTab = 'params' | 'effects';
+
 type NumericSliderProps = {
   definition: Extract<SketchParamDefinition, { type: 'number' }>;
   params: SketchParams;
@@ -138,57 +140,103 @@ export function ParameterControls({
   routedParams,
   onChange,
 }: Props) {
+  const [activeTab, setActiveTab] = useState<ParamsTab>('params');
+
+  const triggerStrobe = () => {
+    onChange('__strobeFlashAt', performance.now());
+  };
+
   return (
     <section className="panel">
-      <h2>Sketch Params</h2>
-      <div className="controlList">
-        {sketch.params.map((definition) => {
-          const routed = routedParams[definition.key];
-          const value = params[definition.key] ?? definition.defaultValue;
-
-          if (definition.type === 'boolean') {
-            return (
-              <label className="toggle" key={definition.key}>
-                <span>{definition.label}</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(value)}
-                  onChange={(event) => onChange(definition.key, event.target.checked)}
-                />
-              </label>
-            );
-          }
-
-          if (definition.type === 'select') {
-            return (
-              <label className="control" key={definition.key}>
-                <span>{definition.label}</span>
-                <select
-                  value={String(value)}
-                  onChange={(event) => onChange(definition.key, event.target.value)}
-                >
-                  {definition.options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            );
-          }
-
-          return (
-            <NumericParameterSlider
-              key={definition.key}
-              definition={definition}
-              params={params}
-              value={value}
-              routed={routed}
-              onChange={onChange}
-            />
-          );
-        })}
+      <div className="panelHeader">
+        <h2>Sketch Params</h2>
+        <div className="panelTabs" role="tablist" aria-label="Sketch panel tabs">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'params'}
+            className={activeTab === 'params' ? 'is-active' : ''}
+            onClick={() => setActiveTab('params')}
+          >
+            Params
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'effects'}
+            className={activeTab === 'effects' ? 'is-active' : ''}
+            onClick={() => setActiveTab('effects')}
+          >
+            Effects
+          </button>
+        </div>
       </div>
+
+      {activeTab === 'params' ? (
+        <div className="controlList">
+          {sketch.params.map((definition) => {
+            const routed = routedParams[definition.key];
+            const value = params[definition.key] ?? definition.defaultValue;
+
+            if (definition.type === 'boolean') {
+              return (
+                <label className="toggle" key={definition.key}>
+                  <span>{definition.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(value)}
+                    onChange={(event) =>
+                      onChange(definition.key, event.target.checked)
+                    }
+                  />
+                </label>
+              );
+            }
+
+            if (definition.type === 'select') {
+              return (
+                <label className="control" key={definition.key}>
+                  <span>{definition.label}</span>
+                  <select
+                    value={String(value)}
+                    onChange={(event) =>
+                      onChange(definition.key, event.target.value)
+                    }
+                  >
+                    {definition.options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            }
+
+            return (
+              <NumericParameterSlider
+                key={definition.key}
+                definition={definition}
+                params={params}
+                value={value}
+                routed={routed}
+                onChange={onChange}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="effectsPanel">
+          <button
+            type="button"
+            className="effectButton strobeButton"
+            onClick={triggerStrobe}
+          >
+            <span>Strobe Flash</span>
+            <b>Trigger</b>
+          </button>
+        </div>
+      )}
     </section>
   );
 }

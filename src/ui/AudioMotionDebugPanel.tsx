@@ -52,9 +52,16 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
 ];
 
 const GRADIENTS = ['classic', 'prism', 'rainbow', 'orangered', 'steelblue'];
+const SNARE_NOISE_FLOOR = 0.04;
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function noiseGate(value: number, floor: number) {
+  const clamped = clamp01(value);
+  if (clamped <= floor) return 0;
+  return clamp01((clamped - floor) / (1 - floor));
 }
 
 function fpsTone(fps: number) {
@@ -173,9 +180,10 @@ export function AudioMotionDebugPanel({
       const snareBand = Math.max(mid, highMid);
       const previous = previousEnergyRef.current;
       const kick = clamp01(Math.max(0, bass - previous.bass) * 4 + peak * 0.15);
-      const snare = clamp01(
+      const snareRaw = clamp01(
         Math.max(0, snareBand - previous.snareBand) * 3 + highMid * 0.35,
       );
+      const snare = noiseGate(snareRaw, SNARE_NOISE_FLOOR);
       const nextMonitorSignals = {
         audioMotionBass: clamp01(bass),
         audioMotionLowMid: clamp01(lowMid),

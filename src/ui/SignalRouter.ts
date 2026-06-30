@@ -9,6 +9,7 @@ import { AttackReleaseFollowerNode } from './AttackReleaseFollowerNode';
 import { ClampNode } from './ClampNode';
 import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
+import { GateNode, type GateMode } from './GateNode';
 import { InverterNode } from './InverterNode';
 import { LerpNode } from './LerpNode';
 import { OffsetNode } from './OffsetNode';
@@ -55,6 +56,18 @@ function cloneNode(node: INode, id = nextNodeId(node.type)) {
     const next = new SignalStrengthNode(id);
     next.multiplier = node.multiplier;
     next.offset = node.offset;
+    clone = next;
+  } else if (node instanceof GateNode) {
+    const next = new GateNode(id);
+    next.mode = node.mode;
+    next.threshold = node.threshold;
+    next.thresholdHigh = node.thresholdHigh;
+    next.hysteresis = node.hysteresis;
+    next.attack = node.attack;
+    next.release = node.release;
+    next.floor = node.floor;
+    next.gain = node.gain;
+    next.bypass = node.bypass;
     clone = next;
   } else if (node instanceof LerpNode) {
     const next = new LerpNode(id);
@@ -169,6 +182,18 @@ function serializeNode(node: INode): SerializedNode {
     serialized.config = { factor: node.factor };
   } else if (node instanceof SignalStrengthNode) {
     serialized.config = { multiplier: node.multiplier, offset: node.offset };
+  } else if (node instanceof GateNode) {
+    serialized.config = {
+      mode: node.mode,
+      threshold: node.threshold,
+      thresholdHigh: node.thresholdHigh,
+      hysteresis: node.hysteresis,
+      attack: node.attack,
+      release: node.release,
+      floor: node.floor,
+      gain: node.gain,
+      bypass: node.bypass,
+    };
   } else if (node instanceof LerpNode) {
     serialized.config = { factor: node.factor };
   } else if (node instanceof InverterNode) {
@@ -312,6 +337,31 @@ function deserializeNode(serialized: SerializedNode) {
       const next = new SignalStrengthNode(id);
       next.multiplier = numberConfig(config, 'multiplier', next.multiplier);
       next.offset = numberConfig(config, 'offset', next.offset);
+      node = next;
+      break;
+    }
+    case 'GateNode': {
+      const next = new GateNode(id);
+      const mode = stringConfig(config, 'mode', next.mode);
+      next.mode = (
+        mode === 'below' ||
+        mode === 'between' ||
+        mode === 'outside'
+          ? mode
+          : 'above'
+      ) as GateMode;
+      next.threshold = numberConfig(config, 'threshold', next.threshold);
+      next.thresholdHigh = numberConfig(
+        config,
+        'thresholdHigh',
+        next.thresholdHigh,
+      );
+      next.hysteresis = numberConfig(config, 'hysteresis', next.hysteresis);
+      next.attack = numberConfig(config, 'attack', next.attack);
+      next.release = numberConfig(config, 'release', next.release);
+      next.floor = numberConfig(config, 'floor', next.floor);
+      next.gain = numberConfig(config, 'gain', next.gain);
+      next.bypass = booleanConfig(config, 'bypass', next.bypass);
       node = next;
       break;
     }

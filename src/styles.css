@@ -231,6 +231,30 @@ input[type='range'] {
   justify-content: space-between;
 }
 
+.panelTabs {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(238, 244, 248, 0.12);
+  border-radius: 6px;
+  background: rgba(14, 27, 31, 0.58);
+}
+
+.panelTabs button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #9fb0b3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.panelTabs button.is-active {
+  background: rgba(57, 210, 192, 0.18);
+  color: #dce8e9;
+}
+
 .buttonRow {
   flex-wrap: wrap;
 }
@@ -247,6 +271,39 @@ input[type='range'] {
 .controlList {
   display: grid;
   gap: 10px;
+}
+
+.effectsPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.effectButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(57, 210, 192, 0.12)),
+    rgba(14, 27, 31, 0.7);
+}
+
+.effectButton span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.effectButton b {
+  color: #d6e85f;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.effectButton:active {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .control,

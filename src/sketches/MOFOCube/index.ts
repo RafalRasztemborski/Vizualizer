@@ -17,6 +17,8 @@ import {
 } from './helpers';
 import { drawWalls } from './walls';
 
+const STROBE_FLASH_DURATION_MS = 180;
+
 export const dupaSketch: P5SketchModule = {
   id: 'dupa',
   name: 'Dupa',
@@ -285,4 +287,31 @@ export function drawDupa({ p, params, routedParams, signals, timeMs }: RuntimeFr
   }
 
   p.pop();
+  drawStrobeFlash(p, params, timeMs);
+}
+
+function drawStrobeFlash(
+  p: RuntimeFrame['p'],
+  params: RuntimeFrame['params'],
+  timeMs: number,
+) {
+  const flashAt = Number(params.__strobeFlashAt ?? 0);
+  if (!Number.isFinite(flashAt) || flashAt <= 0) return;
+
+  const age = timeMs - flashAt;
+  if (age < 0 || age > STROBE_FLASH_DURATION_MS) return;
+
+  const intensity = 1 - age / STROBE_FLASH_DURATION_MS;
+  const alpha = 235 * intensity * intensity;
+  const gl = p.drawingContext as WebGLRenderingContext;
+
+  gl.disable(gl.DEPTH_TEST);
+  p.push();
+  p.resetMatrix();
+  p.noLights();
+  p.noStroke();
+  p.fill(0, 0, 100, alpha);
+  p.plane(p.width * 2, p.height * 2);
+  p.pop();
+  gl.enable(gl.DEPTH_TEST);
 }
