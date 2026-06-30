@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import AudioMotionAnalyzer, {
   type FrequencyScale,
 } from 'audiomotion-analyzer';
 import type { ReactiveSignals } from '../core/types';
-import type { AudioEngine } from '../audio/AudioEngine';
+import {
+  AUDIO_ENGINE_CONTROLS,
+  type AudioEngine,
+  type AudioEngineConfig,
+} from '../audio/AudioEngine';
 
 type Props = {
   audioEngine: AudioEngine;
+  config: AudioEngineConfig;
   signals: ReactiveSignals;
+  fps: number;
   version: number;
+  onConfigChange: (key: keyof AudioEngineConfig, value: number) => void;
   onMonitorSignals?: (signals: AudioMotionMonitorSignals) => void;
 };
 
@@ -53,6 +61,16 @@ function signalPeak(...values: number[]) {
   return clamp01(Math.max(...values.map((value) => value || 0)));
 }
 
+function fpsTone(fps: number) {
+  if (fps >= 50) return 'good';
+  if (fps >= 30) return 'warn';
+  return 'bad';
+}
+
+function formatAudioMotionSignalLabel(key: keyof AudioMotionMonitorSignals) {
+  return key.replace(/^audioMotion/, 'AM ');
+}
+
 function StatusMeter({
   label,
   value,
@@ -77,8 +95,11 @@ function StatusMeter({
 
 export function AudioMotionDebugPanel({
   audioEngine,
+  config,
   signals,
+  fps,
   version,
+  onConfigChange,
   onMonitorSignals,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -91,6 +112,10 @@ export function AudioMotionDebugPanel({
   const [ledBars, setLedBars] = useState(false);
   const [lumiBars, setLumiBars] = useState(false);
   const [showPeaks, setShowPeaks] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [monitorSignals, setMonitorSignals] = useState<AudioMotionMonitorSignals>(
+    EMPTY_AUDIO_MOTION_SIGNALS,
+  );
 
   const modeOptions = useMemo(() => {
     const isGraph = viewMode === 'graph';
@@ -159,10 +184,7 @@ export function AudioMotionDebugPanel({
       const snare = clamp01(
         Math.max(0, snareBand - previous.snareBand) * 3 + highMid * 0.35,
       );
-
-      previousEnergyRef.current = { bass, snareBand };
-
-      onMonitorSignals?.({
+      const nextMonitorSignals = {
         audioMotionBass: clamp01(bass),
         audioMotionLowMid: clamp01(lowMid),
         audioMotionMid: clamp01(mid),
@@ -172,7 +194,12 @@ export function AudioMotionDebugPanel({
         audioMotionPeak: clamp01(peak),
         audioMotionKick: kick,
         audioMotionSnare: snare,
-      });
+      };
+
+      previousEnergyRef.current = { bass, snareBand };
+      setMonitorSignals(nextMonitorSignals);
+
+      onMonitorSignals?.(nextMonitorSignals);
 
       raf = requestAnimationFrame(publishMonitorSignals);
     };
@@ -183,6 +210,7 @@ export function AudioMotionDebugPanel({
       cancelAnimationFrame(raf);
       analyzerRef.current = null;
       previousEnergyRef.current = { bass: 0, snareBand: 0 };
+      setMonitorSignals(EMPTY_AUDIO_MOTION_SIGNALS);
       onMonitorSignals?.(EMPTY_AUDIO_MOTION_SIGNALS);
       analyzer.destroy();
     };
@@ -218,6 +246,17 @@ export function AudioMotionDebugPanel({
   const beatPhase = clamp01(signals.beatPhase ?? 0);
   const kick = signalPeak(signals.kick, signals.kickEnergy, signals.detectedKick);
   const snare = signalPeak(signals.band3, signals.band4, signals.onset * 0.65);
+  const analyzerSignalEntries = [
+    ['Centroid', signals.centroid],
+    ['Flux', signals.flux],
+    ['Onset', signals.onset],
+    ['Band 0', signals.band0],
+    ['Band 1', signals.band1],
+    ['Band 2', signals.band2],
+    ['Band 3', signals.band3],
+    ['Band 4', signals.band4],
+    ['Band 5', signals.band5],
+  ] as const;
 
   return (
     <section className="audioMotionPanel" aria-label="Audio signal monitor">
@@ -226,13 +265,22 @@ export function AudioMotionDebugPanel({
           <h2>Audio Signal Monitor</h2>
           <p>{enabled ? 'AudioMotion Debug View' : 'standby'}</p>
         </div>
-        <button
-          type="button"
-          className={enabled ? 'isActive' : ''}
-          onClick={() => setEnabled((current) => !current)}
-        >
-          {enabled ? 'Disable' : 'Enable'}
-        </button>
+        <div className="topRight">
+          <div className={`fpsReadout ${fpsTone(fps)}`}>
+            <strong>{Math.round(fps)}</strong>
+            <span>FPS</span>
+          </div>
+          <button type="button" onClick={() => setShowAdvanced(true)}>
+            Advanced Audio
+          </button>
+          <button
+            type="button"
+            className={enabled ? 'isActive' : ''}
+            onClick={() => setEnabled((current) => !current)}
+          >
+            {enabled ? 'Disable' : 'Enable'}
+          </button>
+        </div>
       </header>
 
       {enabled ? (
@@ -255,6 +303,23 @@ export function AudioMotionDebugPanel({
               value={snare}
               active={snare > 0.12}
             />
+            {analyzerSignalEntries.map(([label, value]) => (
+              <StatusMeter key={label} label={label} value={value ?? 0} />
+            ))}
+            {AUDIO_MOTION_SIGNAL_KEYS.map((key) => (
+              <StatusMeter
+                key={key}
+                label={formatAudioMotionSignalLabel(key)}
+                value={monitorSignals[key]}
+                active={
+                  key === 'audioMotionKick'
+                    ? monitorSignals[key] > 0.08
+                    : key === 'audioMotionSnare'
+                      ? monitorSignals[key] > 0.12
+                      : undefined
+                }
+              />
+            ))}
           </div>
 
           <div className="audioMotionControls">
@@ -333,6 +398,50 @@ export function AudioMotionDebugPanel({
           </div>
         </>
       ) : null}
+
+      {showAdvanced
+        ? createPortal(
+            <div className="advancedOverlay" role="dialog" aria-modal="true">
+              <div className="advancedDrawer">
+                <header className="advancedHeader">
+                  <div>
+                    <h3>Advanced Audio Config</h3>
+                    <p>Tune temporal smoothing, lookahead and onset detection.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowAdvanced(false)}>
+                    Close
+                  </button>
+                </header>
+                <div className="analyzerControlList">
+                  {Object.entries(config).map(([key, value]) => {
+                    const configKey = key as keyof AudioEngineConfig;
+                    const control = AUDIO_ENGINE_CONTROLS[configKey];
+
+                    return (
+                      <label className="control compactControl" key={key}>
+                        <span>
+                          {control?.label ?? key}
+                          <strong>{Number(value).toFixed(3)}</strong>
+                        </span>
+                        <input
+                          type="range"
+                          min={control?.min ?? 0}
+                          max={control?.max ?? Number(value) * 2}
+                          step={control?.step ?? 0.01}
+                          value={value}
+                          onChange={(event) =>
+                            onConfigChange(configKey, Number(event.target.value))
+                          }
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }

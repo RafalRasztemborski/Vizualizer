@@ -3,7 +3,6 @@ import { AudioEngine, EMPTY_SIGNALS } from './audio/AudioEngine';
 import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
 import { sketches } from './sketches/registry';
-import { AnalyzerPanel } from './ui/AnalyzerPanel';
 import {
   AUDIO_MOTION_SIGNAL_KEYS,
   AudioMotionDebugPanel,
@@ -472,17 +471,13 @@ export function App() {
         />
       </div>
 
-      <AnalyzerPanel
+      <AudioMotionDebugPanel
+        audioEngine={audioRef.current}
         config={audioRef.current.config}
         signals={signals}
         fps={fps}
-        onConfigChange={handleConfigChange}
-      />
-
-      <AudioMotionDebugPanel
-        audioEngine={audioRef.current}
-        signals={signals}
         version={audioVersion}
+        onConfigChange={handleConfigChange}
         onMonitorSignals={handleAudioMotionSignals}
       />
 

@@ -306,26 +306,6 @@ input[type='range'] {
   font-variant-numeric: tabular-nums;
 }
 
-.analyzerOverlay {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
-  width: min(330px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
-  overflow: auto;
-  padding: 9px;
-  border: 1px solid rgba(205, 151, 68, 0.55);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(45, 33, 24, 0.92), rgba(6, 13, 14, 0.88)),
-    #11191a;
-  box-shadow:
-    0 16px 42px rgba(0, 0, 0, 0.42),
-    inset 0 0 0 1px rgba(255, 228, 176, 0.08);
-  backdrop-filter: blur(8px);
-}
-
 .analyzerTopBar {
   min-height: 32px;
   display: flex;
@@ -484,12 +464,12 @@ input[type='range'] {
 
 .audioMotionPanel {
   position: fixed;
+  top: 12px;
   left: 12px;
-  bottom: 252px;
   z-index: 11;
-  width: min(520px, calc(100vw - 410px));
+  width: min(560px, calc(100vw - 410px));
   min-width: 320px;
-  max-height: min(72vh, 640px);
+  max-height: calc(100vh - 24px);
   overflow: auto;
   padding: 10px;
   border: 1px solid rgba(57, 210, 192, 0.42);
@@ -506,6 +486,14 @@ input[type='range'] {
   gap: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(57, 210, 192, 0.18);
+}
+
+.audioMotionHeader .topRight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .audioMotionHeader h2 {
@@ -530,6 +518,57 @@ input[type='range'] {
 .audioMotionHeader button.isActive {
   border-color: rgba(57, 210, 192, 0.72);
   color: #69f3df;
+}
+
+.advancedOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  background: rgba(3, 8, 10, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.advancedDrawer {
+  width: min(860px, calc(100vw - 32px));
+  max-height: min(780px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(57, 210, 192, 0.42);
+  border-radius: 8px;
+  background: rgba(7, 16, 19, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
+}
+
+.advancedHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(57, 210, 192, 0.18);
+}
+
+.advancedHeader h3 {
+  margin: 0;
+  color: #dce8e9;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.advancedHeader p {
+  margin: 2px 0 0;
+  color: #89a1a5;
+  font-size: 10px;
+}
+
+.advancedDrawer .analyzerControlList {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px 12px;
+  padding: 12px 0 0;
 }
 
 .audioMotionCanvas {
@@ -739,17 +778,10 @@ input[type='range'] {
     border-top: 1px solid rgba(238, 244, 248, 0.14);
   }
 
-  .analyzerOverlay {
-    top: 8px;
-    left: 8px;
-    width: min(310px, calc(100vw - 16px));
-    max-height: 48vh;
-  }
-
   .audioMotionPanel {
     position: relative;
+    top: auto;
     left: auto;
-    bottom: auto;
     width: auto;
     min-width: 0;
     max-height: none;
@@ -759,7 +791,8 @@ input[type='range'] {
   }
 
   .debugMeters,
-  .audioMotionControls {
+  .audioMotionControls,
+  .advancedDrawer .analyzerControlList {
     grid-template-columns: 1fr;
   }
 
@@ -1153,7 +1186,7 @@ input[type='range'] {
   border-radius: 12px;
   background: rgba(10, 20, 24, 0.68);
   border: 1px solid rgba(57, 210, 192, 0.28);
-  box-shadow: 
+  box-shadow:
     0 16px 42px rgba(0, 0, 0, 0.45),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 0 16px rgba(57, 210, 192, 0.1);
@@ -1166,7 +1199,7 @@ input[type='range'] {
 
 .inputOverlay:hover {
   border-color: rgba(57, 210, 192, 0.55);
-  box-shadow: 
+  box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.55),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     0 0 24px rgba(57, 210, 192, 0.22);
@@ -1322,14 +1355,15 @@ input[type='range'] {
   background: rgba(255, 95, 87, 0.22);
   border-color: #ff5f57;
   color: #ff5f57;
-  box-shadow: 
+  box-shadow:
     0 0 16px rgba(255, 95, 87, 0.3),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   animation: pulse-border 2s infinite ease-in-out;
 }
 
 @keyframes pulse-border {
-  0%, 100% {
+  0%,
+  100% {
     border-color: rgba(255, 95, 87, 0.6);
     box-shadow: 0 0 12px rgba(255, 95, 87, 0.25);
   }
@@ -1356,7 +1390,7 @@ input[type='range'] {
 }
 
 /* Custom Ranges */
-input[type="range"].modernSlider {
+input[type='range'].modernSlider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -1373,22 +1407,30 @@ input[type="range"].modernSlider {
 }
 
 /* Fill effect updated via JS style --progress */
-input[type="range"].modernSlider::-webkit-slider-runnable-track {
+input[type='range'].modernSlider::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;
   border-radius: 4px;
-  background: linear-gradient(to right, #39d2c0 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+  background: linear-gradient(
+    to right,
+    #39d2c0 var(--progress, 0%),
+    rgba(255, 255, 255, 0.08) var(--progress, 0%)
+  );
 }
 
-input[type="range"].modernSlider::-moz-range-track {
+input[type='range'].modernSlider::-moz-range-track {
   width: 100%;
   height: 6px;
   border-radius: 4px;
-  background: linear-gradient(to right, #39d2c0 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+  background: linear-gradient(
+    to right,
+    #39d2c0 var(--progress, 0%),
+    rgba(255, 255, 255, 0.08) var(--progress, 0%)
+  );
 }
 
 /* Thumb custom styling */
-input[type="range"].modernSlider::-webkit-slider-thumb {
+input[type='range'].modernSlider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
@@ -1402,13 +1444,13 @@ input[type="range"].modernSlider::-webkit-slider-thumb {
   transition: all 0.15s ease;
 }
 
-input[type="range"].modernSlider:hover::-webkit-slider-thumb {
+input[type='range'].modernSlider:hover::-webkit-slider-thumb {
   transform: scale(1.2);
   background: #39d2c0;
   box-shadow: 0 0 10px rgba(57, 210, 192, 1);
 }
 
-input[type="range"].modernSlider::-moz-range-thumb {
+input[type='range'].modernSlider::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -1419,7 +1461,7 @@ input[type="range"].modernSlider::-moz-range-thumb {
   transition: all 0.15s ease;
 }
 
-input[type="range"].modernSlider:hover::-moz-range-thumb {
+input[type='range'].modernSlider:hover::-moz-range-thumb {
   transform: scale(1.2);
   background: #39d2c0;
   box-shadow: 0 0 10px rgba(57, 210, 192, 1);
@@ -1463,30 +1505,38 @@ input[type="range"].modernSlider:hover::-moz-range-thumb {
 }
 
 /* Specific loop slider track overrides */
-input[type="range"].modernSlider.loopSlider::-webkit-slider-runnable-track {
-  background: linear-gradient(to right, #ff5f57 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+input[type='range'].modernSlider.loopSlider::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    #ff5f57 var(--progress, 0%),
+    rgba(255, 255, 255, 0.08) var(--progress, 0%)
+  );
 }
 
-input[type="range"].modernSlider.loopSlider::-moz-range-track {
-  background: linear-gradient(to right, #ff5f57 var(--progress, 0%), rgba(255, 255, 255, 0.08) var(--progress, 0%));
+input[type='range'].modernSlider.loopSlider::-moz-range-track {
+  background: linear-gradient(
+    to right,
+    #ff5f57 var(--progress, 0%),
+    rgba(255, 255, 255, 0.08) var(--progress, 0%)
+  );
 }
 
-input[type="range"].modernSlider.loopSlider::-webkit-slider-thumb {
+input[type='range'].modernSlider.loopSlider::-webkit-slider-thumb {
   border-color: #ff5f57;
   box-shadow: 0 0 6px rgba(255, 95, 87, 0.6);
 }
 
-input[type="range"].modernSlider.loopSlider:hover::-webkit-slider-thumb {
+input[type='range'].modernSlider.loopSlider:hover::-webkit-slider-thumb {
   background: #ff5f57;
   box-shadow: 0 0 10px rgba(255, 95, 87, 1);
 }
 
-input[type="range"].modernSlider.loopSlider::-moz-range-thumb {
+input[type='range'].modernSlider.loopSlider::-moz-range-thumb {
   border-color: #ff5f57;
   box-shadow: 0 0 6px rgba(255, 95, 87, 0.6);
 }
 
-input[type="range"].modernSlider.loopSlider:hover::-moz-range-thumb {
+input[type='range'].modernSlider.loopSlider:hover::-moz-range-thumb {
   background: #ff5f57;
   box-shadow: 0 0 10px rgba(255, 95, 87, 1);
 }
