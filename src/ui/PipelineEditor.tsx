@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { SignalRouter } from './SignalRouter';
-import { INode } from './types';
+import { INode, NodeControlDefinition } from './types';
+import { ADSREnvelopeNode } from './ADSREnvelopeNode';
+import { AttackReleaseFollowerNode } from './AttackReleaseFollowerNode';
 import { SourceNode } from './SourceNode';
 import { TargetNode } from './TargetNode';
 import { SmoothingNode } from './SmoothingNode';
@@ -9,8 +11,10 @@ import { LerpNode } from './LerpNode';
 import { ClampNode } from './ClampNode';
 import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
+import { GateNode } from './GateNode';
 import { InverterNode } from './InverterNode';
 import { OffsetNode } from './OffsetNode';
+import { PeakHoldDecayNode } from './PeakHoldDecayNode';
 import { RemapNode } from './RemapNode';
 import { WaveTransformNode } from './WaveTransformNode';
 import {
@@ -29,11 +33,15 @@ const PROCESSOR_OPTIONS = [
   { type: 'bounce', label: 'Bounce' },
   { type: 'smoothing', label: 'Smoothing' },
   { type: 'strength', label: 'Strength' },
+  { type: 'gate', label: 'Gate' },
   { type: 'clamp', label: 'Clamp' },
   { type: 'curve', label: 'Curve' },
   { type: 'remap', label: 'Remap' },
   { type: 'wave', label: 'Wave Transform' },
   { type: 'strengthener_pro', label: 'Strengthener PRO' },
+  { type: 'attack_release', label: 'Attack / Release' },
+  { type: 'peak_hold_decay', label: 'Peak Hold + Decay' },
+  { type: 'adsr_envelope', label: 'ADSR Envelope' },
 ];
 
 export const PipelineEditor = React.memo<{
@@ -89,6 +97,9 @@ export const PipelineEditor = React.memo<{
         case 'strength':
           node = new SignalStrengthNode(id);
           break;
+        case 'gate':
+          node = new GateNode(id);
+          break;
         case 'lerp':
           node = new LerpNode(id);
           break;
@@ -116,6 +127,15 @@ export const PipelineEditor = React.memo<{
         case 'strengthener_pro':
           node = new SignalStrengthenerProNode(id);
           break;
+        case 'attack_release':
+          node = new AttackReleaseFollowerNode(id);
+          break;
+        case 'peak_hold_decay':
+          node = new PeakHoldDecayNode(id);
+          break;
+        case 'adsr_envelope':
+          node = new ADSREnvelopeNode(id);
+          break;
         default:
           return;
       }
@@ -131,9 +151,7 @@ export const PipelineEditor = React.memo<{
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `signal-router-${new Date()
-        .toISOString()
-        .replace(/[:.]/g, '-')}.json`;
+      link.download = 'kick&snare.json';
       link.click();
       URL.revokeObjectURL(url);
     };
@@ -660,6 +678,8 @@ const PipelineNodeCard = React.memo<{
           isPro={isPro}
           type={node.type}
         />
+
+        <MetadataNodeControls node={node} onUpdate={onUpdate} />
 
         {node instanceof SmoothingNode && (
           <div className="node-settings">
@@ -1244,3 +1264,90 @@ const PipelineNodeCard = React.memo<{
     );
   },
 );
+
+const MetadataNodeControls = React.memo<{
+  node: INode;
+  onUpdate: () => void;
+}>(({ node, onUpdate }) => {
+  if (!node.controls?.length) return null;
+
+  const setControlValue = (
+    control: NodeControlDefinition,
+    value: string | number | boolean,
+  ) => {
+    (node as any)[control.key] = value;
+    onUpdate();
+  };
+
+  return (
+    <div className="node-settings metadata-node-settings">
+      {node.controls.map((control) => {
+        const value = (node as any)[control.key];
+
+        if (control.kind === 'toggle') {
+          return (
+            <label className="metadata-toggle" key={control.key}>
+              <input
+                type="checkbox"
+                checked={Boolean(value)}
+                onChange={(event) =>
+                  setControlValue(control, event.target.checked)
+                }
+              />
+              <span>{control.label}</span>
+            </label>
+          );
+        }
+
+        if (control.kind === 'dropdown') {
+          return (
+            <label className="metadata-control" key={control.key}>
+              <span>{control.label}</span>
+              <select
+                className="compact-select"
+                value={String(value)}
+                onChange={(event) =>
+                  setControlValue(control, event.target.value)
+                }
+              >
+                {(control.options ?? []).map((option) => (
+                  <option key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        }
+
+        const numericValue = Number(value) || 0;
+        return (
+          <label
+            className={`metadata-control metadata-control-${control.kind}`}
+            key={control.key}
+            title={control.description}
+          >
+            <span>
+              {control.label}
+              <b>
+                {control.max && control.max >= 100
+                  ? numericValue.toFixed(0)
+                  : numericValue.toFixed(control.step && control.step < 0.01 ? 4 : 3)}
+              </b>
+            </span>
+            <input
+              type="range"
+              min={control.min ?? 0}
+              max={control.max ?? 1}
+              step={control.step ?? 0.01}
+              value={numericValue}
+              onChange={(event) =>
+                setControlValue(control, Number(event.target.value))
+              }
+            />
+          </label>
+        );
+      })}
+    </div>
+  );
+});

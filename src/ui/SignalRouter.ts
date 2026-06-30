@@ -1,10 +1,19 @@
 import { INode, IConnection, SignalValue } from './types';
+import {
+  ADSREnvelopeNode,
+  ADSRCurveShape,
+  ADSRGateMode,
+  ADSRTriggerMode,
+} from './ADSREnvelopeNode';
+import { AttackReleaseFollowerNode } from './AttackReleaseFollowerNode';
 import { ClampNode } from './ClampNode';
 import { BounceNode } from './BounceNode';
 import { CurveNode } from './CurveNode';
+import { GateNode, type GateMode } from './GateNode';
 import { InverterNode } from './InverterNode';
 import { LerpNode } from './LerpNode';
 import { OffsetNode } from './OffsetNode';
+import { PeakHoldDecayNode } from './PeakHoldDecayNode';
 import { RemapNode } from './RemapNode';
 import { SignalStrengthNode } from './SignalStrengthNode';
 import {
@@ -47,6 +56,18 @@ function cloneNode(node: INode, id = nextNodeId(node.type)) {
     const next = new SignalStrengthNode(id);
     next.multiplier = node.multiplier;
     next.offset = node.offset;
+    clone = next;
+  } else if (node instanceof GateNode) {
+    const next = new GateNode(id);
+    next.mode = node.mode;
+    next.threshold = node.threshold;
+    next.thresholdHigh = node.thresholdHigh;
+    next.hysteresis = node.hysteresis;
+    next.attack = node.attack;
+    next.release = node.release;
+    next.floor = node.floor;
+    next.gain = node.gain;
+    next.bypass = node.bypass;
     clone = next;
   } else if (node instanceof LerpNode) {
     const next = new LerpNode(id);
@@ -102,6 +123,41 @@ function cloneNode(node: INode, id = nextNodeId(node.type)) {
     next.lowExponent = node.lowExponent;
     next.highExponent = node.highExponent;
     clone = next;
+  } else if (node instanceof AttackReleaseFollowerNode) {
+    const next = new AttackReleaseFollowerNode(id);
+    next.attackCoef = node.attackCoef;
+    next.releaseCoef = node.releaseCoef;
+    next.gain = node.gain;
+    next.clampEnabled = node.clampEnabled;
+    next.minOutput = node.minOutput;
+    next.maxOutput = node.maxOutput;
+    next.bypass = node.bypass;
+    clone = next;
+  } else if (node instanceof PeakHoldDecayNode) {
+    const next = new PeakHoldDecayNode(id);
+    next.decayFactor = node.decayFactor;
+    next.peakHoldTimeMs = node.peakHoldTimeMs;
+    next.gain = node.gain;
+    next.threshold = node.threshold;
+    next.autoNormalize = node.autoNormalize;
+    next.bypass = node.bypass;
+    clone = next;
+  } else if (node instanceof ADSREnvelopeNode) {
+    const next = new ADSREnvelopeNode(id);
+    next.attackMs = node.attackMs;
+    next.decayMs = node.decayMs;
+    next.sustain = node.sustain;
+    next.releaseMs = node.releaseMs;
+    next.peakLevel = node.peakLevel;
+    next.triggerMode = node.triggerMode;
+    next.gateMode = node.gateMode;
+    next.curveShape = node.curveShape;
+    next.velocitySensitivity = node.velocitySensitivity;
+    next.syncToBpm = node.syncToBpm;
+    next.bpmMultiplier = node.bpmMultiplier;
+    next.gain = node.gain;
+    next.bypass = node.bypass;
+    clone = next;
   } else {
     throw new Error(`Unsupported node clone type: ${node.type}`);
   }
@@ -126,6 +182,18 @@ function serializeNode(node: INode): SerializedNode {
     serialized.config = { factor: node.factor };
   } else if (node instanceof SignalStrengthNode) {
     serialized.config = { multiplier: node.multiplier, offset: node.offset };
+  } else if (node instanceof GateNode) {
+    serialized.config = {
+      mode: node.mode,
+      threshold: node.threshold,
+      thresholdHigh: node.thresholdHigh,
+      hysteresis: node.hysteresis,
+      attack: node.attack,
+      release: node.release,
+      floor: node.floor,
+      gain: node.gain,
+      bypass: node.bypass,
+    };
   } else if (node instanceof LerpNode) {
     serialized.config = { factor: node.factor };
   } else if (node instanceof InverterNode) {
@@ -175,6 +243,41 @@ function serializeNode(node: INode): SerializedNode {
       lowExponent: node.lowExponent,
       highExponent: node.highExponent,
     };
+  } else if (node instanceof AttackReleaseFollowerNode) {
+    serialized.config = {
+      attackCoef: node.attackCoef,
+      releaseCoef: node.releaseCoef,
+      gain: node.gain,
+      clampEnabled: node.clampEnabled,
+      minOutput: node.minOutput,
+      maxOutput: node.maxOutput,
+      bypass: node.bypass,
+    };
+  } else if (node instanceof PeakHoldDecayNode) {
+    serialized.config = {
+      decayFactor: node.decayFactor,
+      peakHoldTimeMs: node.peakHoldTimeMs,
+      gain: node.gain,
+      threshold: node.threshold,
+      autoNormalize: node.autoNormalize,
+      bypass: node.bypass,
+    };
+  } else if (node instanceof ADSREnvelopeNode) {
+    serialized.config = {
+      attackMs: node.attackMs,
+      decayMs: node.decayMs,
+      sustain: node.sustain,
+      releaseMs: node.releaseMs,
+      peakLevel: node.peakLevel,
+      triggerMode: node.triggerMode,
+      gateMode: node.gateMode,
+      curveShape: node.curveShape,
+      velocitySensitivity: node.velocitySensitivity,
+      syncToBpm: node.syncToBpm,
+      bpmMultiplier: node.bpmMultiplier,
+      gain: node.gain,
+      bypass: node.bypass,
+    };
   } else {
     throw new Error(`Unsupported node serialize type: ${node.type}`);
   }
@@ -198,6 +301,15 @@ function stringConfig(
 ) {
   const value = config?.[key];
   return typeof value === 'string' ? value : fallback;
+}
+
+function booleanConfig(
+  config: Record<string, unknown> | undefined,
+  key: string,
+  fallback: boolean,
+) {
+  const value = config?.[key];
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 function deserializeNode(serialized: SerializedNode) {
@@ -225,6 +337,31 @@ function deserializeNode(serialized: SerializedNode) {
       const next = new SignalStrengthNode(id);
       next.multiplier = numberConfig(config, 'multiplier', next.multiplier);
       next.offset = numberConfig(config, 'offset', next.offset);
+      node = next;
+      break;
+    }
+    case 'GateNode': {
+      const next = new GateNode(id);
+      const mode = stringConfig(config, 'mode', next.mode);
+      next.mode = (
+        mode === 'below' ||
+        mode === 'between' ||
+        mode === 'outside'
+          ? mode
+          : 'above'
+      ) as GateMode;
+      next.threshold = numberConfig(config, 'threshold', next.threshold);
+      next.thresholdHigh = numberConfig(
+        config,
+        'thresholdHigh',
+        next.thresholdHigh,
+      );
+      next.hysteresis = numberConfig(config, 'hysteresis', next.hysteresis);
+      next.attack = numberConfig(config, 'attack', next.attack);
+      next.release = numberConfig(config, 'release', next.release);
+      next.floor = numberConfig(config, 'floor', next.floor);
+      next.gain = numberConfig(config, 'gain', next.gain);
+      next.bypass = booleanConfig(config, 'bypass', next.bypass);
       node = next;
       break;
     }
@@ -326,6 +463,79 @@ function deserializeNode(serialized: SerializedNode) {
       node = next;
       break;
     }
+    case 'AttackReleaseFollowerNode': {
+      const next = new AttackReleaseFollowerNode(id);
+      next.attackCoef = numberConfig(config, 'attackCoef', next.attackCoef);
+      next.releaseCoef = numberConfig(config, 'releaseCoef', next.releaseCoef);
+      next.gain = numberConfig(config, 'gain', next.gain);
+      next.clampEnabled = booleanConfig(
+        config,
+        'clampEnabled',
+        next.clampEnabled,
+      );
+      next.minOutput = numberConfig(config, 'minOutput', next.minOutput);
+      next.maxOutput = numberConfig(config, 'maxOutput', next.maxOutput);
+      next.bypass = booleanConfig(config, 'bypass', next.bypass);
+      node = next;
+      break;
+    }
+    case 'PeakHoldDecayNode': {
+      const next = new PeakHoldDecayNode(id);
+      next.decayFactor = numberConfig(config, 'decayFactor', next.decayFactor);
+      next.peakHoldTimeMs = numberConfig(
+        config,
+        'peakHoldTimeMs',
+        next.peakHoldTimeMs,
+      );
+      next.gain = numberConfig(config, 'gain', next.gain);
+      next.threshold = numberConfig(config, 'threshold', next.threshold);
+      next.autoNormalize = booleanConfig(
+        config,
+        'autoNormalize',
+        next.autoNormalize,
+      );
+      next.bypass = booleanConfig(config, 'bypass', next.bypass);
+      node = next;
+      break;
+    }
+    case 'ADSREnvelopeNode': {
+      const next = new ADSREnvelopeNode(id);
+      next.attackMs = numberConfig(config, 'attackMs', next.attackMs);
+      next.decayMs = numberConfig(config, 'decayMs', next.decayMs);
+      next.sustain = numberConfig(config, 'sustain', next.sustain);
+      next.releaseMs = numberConfig(config, 'releaseMs', next.releaseMs);
+      next.peakLevel = numberConfig(config, 'peakLevel', next.peakLevel);
+      next.triggerMode = stringConfig(
+        config,
+        'triggerMode',
+        next.triggerMode,
+      ) as ADSRTriggerMode;
+      next.gateMode = stringConfig(
+        config,
+        'gateMode',
+        next.gateMode,
+      ) as ADSRGateMode;
+      next.curveShape = stringConfig(
+        config,
+        'curveShape',
+        next.curveShape,
+      ) as ADSRCurveShape;
+      next.velocitySensitivity = numberConfig(
+        config,
+        'velocitySensitivity',
+        next.velocitySensitivity,
+      );
+      next.syncToBpm = booleanConfig(config, 'syncToBpm', next.syncToBpm);
+      next.bpmMultiplier = stringConfig(
+        config,
+        'bpmMultiplier',
+        next.bpmMultiplier,
+      );
+      next.gain = numberConfig(config, 'gain', next.gain);
+      next.bypass = booleanConfig(config, 'bypass', next.bypass);
+      node = next;
+      break;
+    }
     default:
       throw new Error(`Unsupported node import type: ${serialized.kind}`);
   }
@@ -401,16 +611,30 @@ export class SignalRouter {
       const next = this.nodes.get(this.pipeline[i + 1]);
 
       if (current && next) {
-        const outPorts = Object.keys(current.outputs);
-        const inPorts = Object.keys(next.inputs);
+        const outPort =
+          this.preferredPort(current.outputs, [
+            'out',
+            'outputSignal',
+            'envelope',
+            'normalizedPeak',
+          ]) ?? Object.keys(current.outputs)[0];
+        const inPort =
+          this.preferredPort(next.inputs, ['in', 'inputSignal', 'trigger']) ??
+          Object.keys(next.inputs)[0];
 
-        // Auto-connect tylko gdy mamy sytuację 1-to-1
-        if (outPorts.length === 1 && inPorts.length === 1) {
-          this.connect(current.id, outPorts[0], next.id, inPorts[0]);
+        if (outPort && inPort) {
+          this.connect(current.id, outPort, next.id, inPort);
         }
       }
     }
     this.invalidateOrder();
+  }
+
+  private preferredPort(
+    ports: Record<string, unknown>,
+    preferredIds: string[],
+  ) {
+    return preferredIds.find((portId) => Object.prototype.hasOwnProperty.call(ports, portId));
   }
 
   /**

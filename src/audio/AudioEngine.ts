@@ -101,6 +101,14 @@ export class AudioEngine {
     return this.signals;
   }
 
+  get audioContext() {
+    return this.context;
+  }
+
+  get audioMonitorNode() {
+    return this.analyser;
+  }
+
   async ensureContext() {
     if (!this.context) {
       this.context = new AudioContext();

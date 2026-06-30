@@ -3,7 +3,12 @@ import { AudioEngine, EMPTY_SIGNALS } from './audio/AudioEngine';
 import { MidiManager } from './midi/MidiManager';
 import { P5Canvas, type P5RuntimeState } from './p5/P5Canvas';
 import { sketches } from './sketches/registry';
-import { AnalyzerPanel } from './ui/AnalyzerPanel';
+import {
+  AUDIO_MOTION_SIGNAL_KEYS,
+  AudioMotionDebugPanel,
+  EMPTY_AUDIO_MOTION_SIGNALS,
+  type AudioMotionMonitorSignals,
+} from './ui/AudioMotionDebugPanel';
 import { ParameterControls } from './ui/ParameterControls';
 import { SignalRouter } from './ui/SignalRouter';
 import { SignalRouterUI } from './ui/SignalRouterUI';
@@ -15,9 +20,15 @@ import { PipelineEditor } from './ui/PipelineEditor';
 import type {
   NumericRecord,
   ReactiveSignals,
+  SketchParamDefinition,
   SketchParams,
   SketchParamValue,
 } from './core/types';
+
+type NumericSketchParamDefinition = Extract<
+  SketchParamDefinition,
+  { type: 'number' }
+>;
 
 const MIDI_SOURCE_KEYS = Array.from(
   { length: 128 },
@@ -43,11 +54,17 @@ function wrapDegrees(value: number) {
   return ((value % 360) + 360) % 360;
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 const DUPA_ARCH_KEYS = [
   'frontBackArch',
   'leftRightArch',
   'topBottomArch',
 ] as const;
+
+const DUPA_GAP_KEYS = ['X_GAP', 'Y_GAP', 'Z_GAP'] as const;
 
 type DupaArchBaselines = Record<(typeof DUPA_ARCH_KEYS)[number], number>;
 
@@ -181,11 +198,10 @@ export function App() {
   const [fps, setFps] = useState(0);
   const [audioVersion, setAudioVersion] = useState(0);
   const audioRef = useRef(new AudioEngine());
-  const midiRef = useRef(new MidiManager());
-  const fpsRef = useRef({
-    frames: 0,
-    lastSample: performance.now(),
+  const audioMotionSignalsRef = useRef<AudioMotionMonitorSignals>({
+    ...EMPTY_AUDIO_MOTION_SIGNALS,
   });
+  const midiRef = useRef(new MidiManager());
   const runtimeRef = useRef<P5RuntimeState>({
     params: initialParams,
     routedParams: {},
@@ -219,7 +235,11 @@ export function App() {
     const tick = () => {
       const nextSignals = audioRef.current.update();
       const nextMidi = midiRef.current.currentValues;
-      const baseSources = { ...numericSignals(nextSignals), ...nextMidi };
+      const baseSources = {
+        ...numericSignals(nextSignals),
+        ...audioMotionSignalsRef.current,
+        ...nextMidi,
+      };
       const chainSources: NumericRecord = {};
       const nextRouted: NumericRecord = {};
 
@@ -255,16 +275,6 @@ export function App() {
       };
 
       const now = performance.now();
-      fpsRef.current.frames += 1;
-      if (now - fpsRef.current.lastSample >= 500) {
-        setFps(
-          (fpsRef.current.frames * 1000) / (now - fpsRef.current.lastSample),
-        );
-        fpsRef.current = {
-          frames: 0,
-          lastSample: now,
-        };
-      }
 
       if (now - lastUiUpdate > 50) {
         setSignals(nextSignals);
@@ -287,12 +297,30 @@ export function App() {
     setAudioVersion((version) => version + 1);
   }, []);
 
+  const handleCanvasFrameRate = useCallback((nextFps: number) => {
+    setFps(nextFps);
+  }, []);
+
+  const handleAudioMotionSignals = useCallback(
+    (nextSignals: AudioMotionMonitorSignals) => {
+      audioMotionSignalsRef.current = nextSignals;
+    },
+    [],
+  );
+
   const sourceKeys = useMemo(() => {
     const signalKeys = Object.keys(numericSignals(signals)).sort();
     const extraMidiKeys = Object.keys(midi)
       .filter((key) => !/^cc\d+$/.test(key))
       .sort();
-    return [...new Set([...signalKeys, ...MIDI_SOURCE_KEYS, ...extraMidiKeys])];
+    return [
+      ...new Set([
+        ...signalKeys,
+        ...AUDIO_MOTION_SIGNAL_KEYS,
+        ...MIDI_SOURCE_KEYS,
+        ...extraMidiKeys,
+      ]),
+    ];
   }, [signals, midi]);
 
   const targetKeys = useMemo(
@@ -308,11 +336,31 @@ export function App() {
       selectedSketch.params.some((param) => param.key === 'Y_ROTATE'),
     [selectedSketch],
   );
+  const zoomParam = useMemo<NumericSketchParamDefinition | undefined>(
+    () =>
+      selectedSketch.params.find(
+        (param): param is NumericSketchParamDefinition =>
+          param.type === 'number' && param.key === 'z_position',
+      ),
+    [selectedSketch],
+  );
 
   const handleParamChange = useCallback(
     (key: string, value: SketchParamValue) => {
       if (selectedSketchId !== 'dupa') {
         setParams((current) => ({ ...current, [key]: value }));
+        return;
+      }
+
+      if (key === 'GAP_MASTER') {
+        const nextGap = Number(value);
+        setParams((current) => ({
+          ...current,
+          GAP_MASTER: nextGap,
+          ...Object.fromEntries(
+            DUPA_GAP_KEYS.map((gapKey) => [gapKey, nextGap]),
+          ),
+        }));
         return;
       }
 
@@ -391,6 +439,27 @@ export function App() {
           key={selectedSketch.id}
           sketch={selectedSketch}
           runtimeRef={runtimeRef}
+          onFrameRate={handleCanvasFrameRate}
+          onZoomWheel={
+            zoomParam
+              ? (deltaY) => {
+                  const sensitivity = 1.6;
+                  setParams((current) => {
+                    const currentZ = Number(
+                      current.z_position ?? zoomParam.defaultValue,
+                    );
+                    return {
+                      ...current,
+                      z_position: clampNumber(
+                        currentZ - deltaY * sensitivity,
+                        zoomParam.min,
+                        zoomParam.max,
+                      ),
+                    };
+                  });
+                }
+              : undefined
+          }
           onRotateDrag={
             supportsDragRotate
               ? (deltaX, deltaY) => {
@@ -416,11 +485,14 @@ export function App() {
         />
       </div>
 
-      <AnalyzerPanel
+      <AudioMotionDebugPanel
+        audioEngine={audioRef.current}
         config={audioRef.current.config}
         signals={signals}
         fps={fps}
+        version={audioVersion}
         onConfigChange={handleConfigChange}
+        onMonitorSignals={handleAudioMotionSignals}
       />
 
       <aside className="sidebar">
