@@ -7,6 +7,9 @@ import {
   sineFalloff,
   serpentinePosition,
   spectrumValueHz,
+  stringParam,
+  transformWallSample,
+  type WallLayoutStyle,
   wallEnabled,
 } from './helpers';
 import { colorForBox, drawBox } from './rendering';
@@ -55,45 +58,64 @@ export function drawTopBottomWalls({
     0.05,
     routedNumber(params, routedParams, 'topBottomEdgeAlignRadius', 0.75),
   );
+  const mirrorTopWall = boolParam(params, 'mirrorTopWall', false);
+  const mirrorBottomWall = boolParam(params, 'mirrorBottomWall', false);
+  const topWallLayout = stringParam(
+    params,
+    'topWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
+  const bottomWallLayout = stringParam(
+    params,
+    'bottomWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
 
-  for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x - 1, xRows - 2);
+  const motionForCell = (sampleX: number, sampleZ: number) => {
+    const falloffX = sineFalloff(sampleX - 1, xRows - 2);
+    const falloffZ = sineFalloff(sampleZ - 1, zRows - 2);
+    const falloff = (falloffX + falloffZ) / 2;
 
-    for (let z = 1; z < zRows - 1; z += 1) {
-      const falloffZ = sineFalloff(z - 1, zRows - 2);
-      const falloff = (falloffX + falloffZ) / 2;
+    const spectralEnergy = spectrumValueHz(
+      spectrumTB,
+      nyquist,
+      serpentinePosition(sampleX, xRows, sampleZ, zRows),
+      routedNumber(params, routedParams, 'TopBottomHZRangeMin', 260),
+      routedNumber(params, routedParams, 'TopBottomHZRangeMax', 2500),
+    );
+    const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
+    const anim = falloff * energy * audioDepth;
+    const archStrength = archStrengthWithSine(
+      params,
+      routedParams,
+      'topBottomArch',
+      0.5,
+      serpentinePosition(sampleX, xRows, sampleZ, zRows),
+    );
+    const wallPower = Math.max(
+      0,
+      routedNumber(params, routedParams, 'topBottomWallPower', 1),
+    );
 
-      const spectralEnergy = spectrumValueHz(
-        spectrumTB,
-        nyquist,
-        serpentinePosition(x, xRows, z, zRows),
-        routedNumber(params, routedParams, 'TopBottomHZRangeMin', 260),
-        routedNumber(params, routedParams, 'TopBottomHZRangeMax', 2500),
-      );
-      const energy = spectralEnergy * 1.25 + topBottomPulse * 0.15;
-      const anim = falloff * energy * audioDepth;
-      const px = -totalWidth / 2 + x * stepX + stepX / 2;
-      const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
-      const warpedZ = pz + pz * crazyZ;
-      const archStrength = archStrengthWithSine(
-        params,
-        routedParams,
-        'topBottomArch',
-        0.5,
-        serpentinePosition(x, xRows, z, zRows),
-      );
-      const wallPower = Math.max(
-        0,
-        routedNumber(params, routedParams, 'topBottomWallPower', 1),
-      );
-      const { startOffset, sizeAdd } = wallMotion(
+    return {
+      falloff,
+      energy,
+      ...wallMotion(
         anim,
         archStrength,
         wallPower,
         falloff,
         falloffX * falloffZ,
         stepY,
-      );
+      ),
+    };
+  };
+
+  for (let x = 1; x < xRows - 1; x += 1) {
+    for (let z = 1; z < zRows - 1; z += 1) {
+      const px = -totalWidth / 2 + x * stepX + stepX / 2;
+      const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
+      const warpedZ = pz + pz * crazyZ;
 
       const edgeAlign = edgeAlignEnabled
         ? topBottomEdgeAlignment({
@@ -118,7 +140,20 @@ export function drawTopBottomWalls({
         : { top: { x: 0, z: 0 }, bottom: { x: 0, z: 0 } };
 
       if (wallEnabled(params, 'top')) {
-        const py = totalHeight / 2 - stepY / 2 + startOffset + sizeAdd / 2;
+        const topSample = transformWallSample(
+          x,
+          z,
+          xRows,
+          zRows,
+          topWallLayout,
+          mirrorTopWall,
+        );
+        const topMotion = motionForCell(topSample.primary, topSample.secondary);
+        const py =
+          totalHeight / 2 -
+          stepY / 2 +
+          topMotion.startOffset +
+          topMotion.sizeAdd / 2;
 
         drawBox(
           p,
@@ -127,14 +162,37 @@ export function drawTopBottomWalls({
           //warpedZ + edgeAlign.top.z,
           warpedZ + edgeAlign.top.z,
           xSize,
-          ySize + sizeAdd,
+          ySize + topMotion.sizeAdd,
           zSize,
-          colorForBox(params, routedParams, 'top', falloff, energy, timeMs),
+          colorForBox(
+            params,
+            routedParams,
+            'top',
+            topMotion.falloff,
+            topMotion.energy,
+            timeMs,
+          ),
         );
       }
 
       if (wallEnabled(params, 'bottom')) {
-        const py = -totalHeight / 2 + stepY / 2 - startOffset - sizeAdd / 2;
+        const bottomSample = transformWallSample(
+          x,
+          z,
+          xRows,
+          zRows,
+          bottomWallLayout,
+          mirrorBottomWall,
+        );
+        const bottomMotion = motionForCell(
+          bottomSample.primary,
+          bottomSample.secondary,
+        );
+        const py =
+          -totalHeight / 2 +
+          stepY / 2 -
+          bottomMotion.startOffset -
+          bottomMotion.sizeAdd / 2;
 
         drawBox(
           p,
@@ -142,9 +200,16 @@ export function drawTopBottomWalls({
           py,
           warpedZ + edgeAlign.bottom.z,
           xSize,
-          ySize + sizeAdd,
+          ySize + bottomMotion.sizeAdd,
           zSize,
-          colorForBox(params, routedParams, 'bottom', falloff, energy, timeMs),
+          colorForBox(
+            params,
+            routedParams,
+            'bottom',
+            bottomMotion.falloff,
+            bottomMotion.energy,
+            timeMs,
+          ),
         );
       }
     }

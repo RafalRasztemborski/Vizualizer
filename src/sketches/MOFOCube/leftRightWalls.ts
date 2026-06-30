@@ -7,6 +7,9 @@ import {
   sineFalloff,
   serpentinePosition,
   spectrumValueHz,
+  stringParam,
+  transformWallSample,
+  type WallLayoutStyle,
   wallEnabled,
 } from './helpers';
 import { colorForBox, drawBox } from './rendering';
@@ -55,45 +58,64 @@ export function drawLeftRightWalls({
     0.05,
     routedNumber(params, routedParams, 'leftRightEdgeAlignRadius', 0.75),
   );
+  const mirrorLeftWall = boolParam(params, 'mirrorLeftWall', false);
+  const mirrorRightWall = boolParam(params, 'mirrorRightWall', false);
+  const leftWallLayout = stringParam(
+    params,
+    'leftWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
+  const rightWallLayout = stringParam(
+    params,
+    'rightWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
 
-  for (let y = 1; y < yRows - 1; y += 1) {
-    const falloffY = sineFalloff(y - 1, yRows - 2);
+  const motionForCell = (sampleY: number, sampleZ: number) => {
+    const falloffY = sineFalloff(sampleY - 1, yRows - 2);
+    const falloffZ = sineFalloff(sampleZ - 1, zRows - 2);
+    const falloff = (falloffY + falloffZ) / 2;
 
-    for (let z = 1; z < zRows - 1; z += 1) {
-      const falloffZ = sineFalloff(z - 1, zRows - 2);
-      const falloff = (falloffY + falloffZ) / 2;
+    const spectralEnergy = spectrumValueHz(
+      spectrumLR,
+      nyquist,
+      serpentinePosition(sampleZ, zRows, sampleY, yRows),
+      routedNumber(params, routedParams, 'Left&RightHZRangeMin', 35),
+      routedNumber(params, routedParams, 'Left&RightHZRangeMax', 260),
+    );
+    const energy = spectralEnergy * 1.25 + sidePulse * 0.15;
+    const anim = falloff * energy * audioDepth;
+    const archStrength = archStrengthWithSine(
+      params,
+      routedParams,
+      'leftRightArch',
+      0.5,
+      serpentinePosition(sampleZ, zRows, sampleY, yRows),
+    );
+    const wallPower = Math.max(
+      0,
+      routedNumber(params, routedParams, 'leftRightWallPower', 1),
+    );
 
-      const spectralEnergy = spectrumValueHz(
-        spectrumLR,
-        nyquist,
-        serpentinePosition(z, zRows, y, yRows),
-        routedNumber(params, routedParams, 'Left&RightHZRangeMin', 35),
-        routedNumber(params, routedParams, 'Left&RightHZRangeMax', 260),
-      );
-      const energy = spectralEnergy * 1.25 + sidePulse * 0.15;
-      const anim = falloff * energy * audioDepth;
-      const py = totalHeight / 2 - y * stepY - stepY / 2;
-      const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
-      const warpedZ = pz + pz * crazyZ;
-      const archStrength = archStrengthWithSine(
-        params,
-        routedParams,
-        'leftRightArch',
-        0.5,
-        serpentinePosition(z, zRows, y, yRows),
-      );
-      const wallPower = Math.max(
-        0,
-        routedNumber(params, routedParams, 'leftRightWallPower', 1),
-      );
-      const { startOffset, sizeAdd } = wallMotion(
+    return {
+      falloff,
+      energy,
+      ...wallMotion(
         anim,
         archStrength,
         wallPower,
         falloff,
         falloffY * falloffZ,
         stepX,
-      );
+      ),
+    };
+  };
+
+  for (let y = 1; y < yRows - 1; y += 1) {
+    for (let z = 1; z < zRows - 1; z += 1) {
+      const py = totalHeight / 2 - y * stepY - stepY / 2;
+      const pz = -totalDepth / 2 + z * stepZ + stepZ / 2;
+      const warpedZ = pz + pz * crazyZ;
 
       const edgeAlign = edgeAlignEnabled
         ? leftRightEdgeAlignment({
@@ -118,32 +140,78 @@ export function drawLeftRightWalls({
         : { left: { y: 0, z: 0 }, right: { y: 0, z: 0 } };
 
       if (wallEnabled(params, 'left')) {
-        const px = -totalWidth / 2 + stepX / 2 - startOffset - sizeAdd / 2;
+        const leftSample = transformWallSample(
+          y,
+          z,
+          yRows,
+          zRows,
+          leftWallLayout,
+          mirrorLeftWall,
+        );
+        const leftMotion = motionForCell(
+          leftSample.primary,
+          leftSample.secondary,
+        );
+        const px =
+          -totalWidth / 2 +
+          stepX / 2 -
+          leftMotion.startOffset -
+          leftMotion.sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.left.y,
           warpedZ + edgeAlign.left.z,
-          xSize + sizeAdd,
+          xSize + leftMotion.sizeAdd,
           ySize,
           zSize,
-          colorForBox(params, routedParams, 'left', falloff, energy, timeMs),
+          colorForBox(
+            params,
+            routedParams,
+            'left',
+            leftMotion.falloff,
+            leftMotion.energy,
+            timeMs,
+          ),
         );
       }
 
       if (wallEnabled(params, 'right')) {
-        const px = totalWidth / 2 - stepX / 2 + startOffset + sizeAdd / 2;
+        const rightSample = transformWallSample(
+          y,
+          z,
+          yRows,
+          zRows,
+          rightWallLayout,
+          mirrorRightWall,
+        );
+        const rightMotion = motionForCell(
+          rightSample.primary,
+          rightSample.secondary,
+        );
+        const px =
+          totalWidth / 2 -
+          stepX / 2 +
+          rightMotion.startOffset +
+          rightMotion.sizeAdd / 2;
 
         drawBox(
           p,
           px,
           py + edgeAlign.right.y,
           warpedZ + edgeAlign.right.z,
-          xSize + sizeAdd,
+          xSize + rightMotion.sizeAdd,
           ySize,
           zSize,
-          colorForBox(params, routedParams, 'right', falloff, energy, timeMs),
+          colorForBox(
+            params,
+            routedParams,
+            'right',
+            rightMotion.falloff,
+            rightMotion.energy,
+            timeMs,
+          ),
         );
       }
     }
@@ -293,4 +361,3 @@ function leftRightEdgeAlignmentForX({
     z: (frontOffset * frontWeight + backOffset * backWeight) * amount,
   };
 }
-

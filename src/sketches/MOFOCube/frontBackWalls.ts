@@ -7,6 +7,9 @@ import {
   sineFalloff,
   serpentinePosition,
   spectrumValueHz,
+  stringParam,
+  transformWallSample,
+  type WallLayoutStyle,
   wallEnabled,
 } from './helpers';
 import { colorForBox, drawBox } from './rendering';
@@ -53,43 +56,62 @@ export function drawFrontBackWalls({
     0.05,
     routedNumber(params, routedParams, 'frontBackEdgeAlignRadius', 0.75),
   );
+  const mirrorFrontWall = boolParam(params, 'mirrorFrontWall', false);
+  const mirrorBackWall = boolParam(params, 'mirrorBackWall', false);
+  const frontWallLayout = stringParam(
+    params,
+    'frontWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
+  const backWallLayout = stringParam(
+    params,
+    'backWallLayout',
+    'normal',
+  ) as WallLayoutStyle;
 
-  for (let x = 1; x < xRows - 1; x += 1) {
-    const falloffX = sineFalloff(x - 1, xRows - 2);
+  const motionForCell = (sampleX: number, sampleY: number) => {
+    const falloffX = sineFalloff(sampleX - 1, xRows - 2);
+    const falloffY = sineFalloff(sampleY - 1, yRows - 2);
+    const falloff = (falloffX + falloffY) / 2;
+    const spectralEnergy = spectrumValueHz(
+      spectrumFB,
+      nyquist,
+      serpentinePosition(sampleX, xRows, sampleY, yRows),
+      routedNumber(params, routedParams, 'Front&BackHZRangeMin', 2500),
+      routedNumber(params, routedParams, 'Front&BackHZRangeMax', 12000),
+    );
+    const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
+    const anim = falloff * energy * audioDepth;
+    const archStrength = archStrengthWithSine(
+      params,
+      routedParams,
+      'frontBackArch',
+      1.5,
+      serpentinePosition(sampleX, xRows, sampleY, yRows),
+    );
+    const wallPower = Math.max(
+      0,
+      routedNumber(params, routedParams, 'frontBackWallPower', 1),
+    );
 
-    for (let y = 1; y < yRows - 1; y += 1) {
-      const falloffY = sineFalloff(y - 1, yRows - 2);
-      const falloff = (falloffX + falloffY) / 2; // Średnia, aby tylko rogi (0,0) były nieruchome
-      const spectralEnergy = spectrumValueHz(
-        spectrumFB,
-        nyquist,
-        serpentinePosition(x, xRows, y, yRows),
-        routedNumber(params, routedParams, 'Front&BackHZRangeMin', 2500),
-        routedNumber(params, routedParams, 'Front&BackHZRangeMax', 12000),
-      );
-      const energy = spectralEnergy * 1.25 + frontBackPulse * 0.15;
-      const anim = falloff * energy * audioDepth;
-      const px = -totalWidth / 2 + x * stepX + stepX / 2;
-      const py = totalHeight / 2 - y * stepY - stepY / 2;
-      const archStrength = archStrengthWithSine(
-        params,
-        routedParams,
-        'frontBackArch',
-        1.5,
-        serpentinePosition(x, xRows, y, yRows),
-      );
-      const wallPower = Math.max(
-        0,
-        routedNumber(params, routedParams, 'frontBackWallPower', 1),
-      );
-      const { startOffset, sizeAdd } = wallMotion(
+    return {
+      falloff,
+      energy,
+      ...wallMotion(
         anim,
         archStrength,
         wallPower,
         falloff,
         falloffX * falloffY,
         stepZ,
-      );
+      ),
+    };
+  };
+
+  for (let x = 1; x < xRows - 1; x += 1) {
+    for (let y = 1; y < yRows - 1; y += 1) {
+      const px = -totalWidth / 2 + x * stepX + stepX / 2;
+      const py = totalHeight / 2 - y * stepY - stepY / 2;
       const edgeAlign = edgeAlignEnabled
         ? frontBackEdgeAlignment({
           params,
@@ -112,7 +134,23 @@ export function drawFrontBackWalls({
         : { front: { x: 0, y: 0 }, back: { x: 0, y: 0 } };
 
       if (wallEnabled(params, 'front')) {
-        const pz = -totalDepth / 2 + stepZ / 2 - startOffset - sizeAdd / 2;
+        const frontSample = transformWallSample(
+          x,
+          y,
+          xRows,
+          yRows,
+          frontWallLayout,
+          mirrorFrontWall,
+        );
+        const frontMotion = motionForCell(
+          frontSample.primary,
+          frontSample.secondary,
+        );
+        const pz =
+          -totalDepth / 2 +
+          stepZ / 2 -
+          frontMotion.startOffset -
+          frontMotion.sizeAdd / 2;
 
         drawBox(
           p,
@@ -121,13 +159,36 @@ export function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + sizeAdd,
-          colorForBox(params, routedParams, 'front', falloff, energy, timeMs),
+          zSize + frontMotion.sizeAdd,
+          colorForBox(
+            params,
+            routedParams,
+            'front',
+            frontMotion.falloff,
+            frontMotion.energy,
+            timeMs,
+          ),
         );
       }
 
       if (wallEnabled(params, 'back')) {
-        const pz = totalDepth / 2 - stepZ / 2 + startOffset + sizeAdd / 2;
+        const backSample = transformWallSample(
+          x,
+          y,
+          xRows,
+          yRows,
+          backWallLayout,
+          mirrorBackWall,
+        );
+        const backMotion = motionForCell(
+          backSample.primary,
+          backSample.secondary,
+        );
+        const pz =
+          totalDepth / 2 -
+          stepZ / 2 +
+          backMotion.startOffset +
+          backMotion.sizeAdd / 2;
 
         drawBox(
           p,
@@ -136,8 +197,15 @@ export function drawFrontBackWalls({
           pz,
           xSize,
           ySize,
-          zSize + sizeAdd,
-          colorForBox(params, routedParams, 'back', falloff, energy, timeMs),
+          zSize + backMotion.sizeAdd,
+          colorForBox(
+            params,
+            routedParams,
+            'back',
+            backMotion.falloff,
+            backMotion.energy,
+            timeMs,
+          ),
         );
       }
     }
@@ -281,4 +349,3 @@ function frontBackEdgeAlignmentForZ({
     y: (topOffset * topWeight + bottomOffset * bottomWeight) * amount,
   };
 }
-

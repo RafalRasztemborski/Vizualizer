@@ -30,6 +30,11 @@ export function boolParam(params: SketchParams, key: string, fallback = false) {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+export function stringParam(params: SketchParams, key: string, fallback = '') {
+  const value = params[key];
+  return typeof value === 'string' ? value : fallback;
+}
+
 export function wallEnabled(params: SketchParams, wall: WallName) {
   return boolParam(params, WALL_PARAM[wall], true);
 }
@@ -125,6 +130,81 @@ export function serpentinePosition(
   return index / maxIndex;
 }
 
+export type WallLayoutStyle =
+  | 'normal'
+  | 'flipPrimary'
+  | 'flipSecondary'
+  | 'rotate180'
+  | 'diagonalSwap'
+  | 'checkerFlip'
+  | 'centerFold';
+
+function clampGridIndex(index: number, count: number) {
+  return Math.max(1, Math.min(count - 2, Math.round(index)));
+}
+
+function mirrorIndex(index: number, count: number) {
+  return count - 1 - index;
+}
+
+function normalizedInner(index: number, count: number) {
+  const innerCount = Math.max(1, count - 2);
+  return innerCount <= 1 ? 0 : (index - 1) / (innerCount - 1);
+}
+
+function denormalizedInner(value: number, count: number) {
+  return 1 + clamp01(value) * Math.max(0, count - 3);
+}
+
+export function transformWallSample(
+  primary: number,
+  secondary: number,
+  primaryCount: number,
+  secondaryCount: number,
+  style: WallLayoutStyle,
+  mirror = false,
+) {
+  let a = primary;
+  let b = secondary;
+
+  if (mirror) {
+    a = mirrorIndex(a, primaryCount);
+    b = mirrorIndex(b, secondaryCount);
+  }
+
+  if (style === 'flipPrimary') {
+    a = mirrorIndex(a, primaryCount);
+  } else if (style === 'flipSecondary') {
+    b = mirrorIndex(b, secondaryCount);
+  } else if (style === 'rotate180') {
+    a = mirrorIndex(a, primaryCount);
+    b = mirrorIndex(b, secondaryCount);
+  } else if (style === 'diagonalSwap') {
+    const na = normalizedInner(a, primaryCount);
+    const nb = normalizedInner(b, secondaryCount);
+    a = denormalizedInner(nb, primaryCount);
+    b = denormalizedInner(na, secondaryCount);
+  } else if (style === 'checkerFlip') {
+    if ((primary + secondary) % 2 === 0) {
+      a = mirrorIndex(a, primaryCount);
+    } else {
+      b = mirrorIndex(b, secondaryCount);
+    }
+  } else if (style === 'centerFold') {
+    const na = normalizedInner(a, primaryCount);
+    const nb = normalizedInner(b, secondaryCount);
+    const foldedA = na <= 0.5 ? na * 2 : (1 - na) * 2;
+    const foldedB = nb <= 0.5 ? nb * 2 : (1 - nb) * 2;
+    a = denormalizedInner(foldedA, primaryCount);
+    b = denormalizedInner(foldedB, secondaryCount);
+  }
+
+  return {
+    primary: clampGridIndex(a, primaryCount),
+    secondary: clampGridIndex(b, secondaryCount),
+  };
+}
+
 export function updateSmoothedSpectrum(
   current: number[],
   target: number[],
@@ -136,4 +216,3 @@ export function updateSmoothedSpectrum(
   }
   return current;
 }
-
