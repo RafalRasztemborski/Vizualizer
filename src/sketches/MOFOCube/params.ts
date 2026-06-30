@@ -131,6 +131,15 @@ export const MOFO_CUBE_PARAMS: SketchParamDefinition[] = [
       step: 1,
       defaultValue: 1,
     },
+    {
+      key: 'GAP_MASTER',
+      label: 'All gaps',
+      type: 'number',
+      min: 0,
+      max: 100,
+      step: 1,
+      defaultValue: 1,
+    },
 
     {
       key: 'X_ROTATE',

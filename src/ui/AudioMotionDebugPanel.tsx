@@ -57,18 +57,10 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
 
-function signalPeak(...values: number[]) {
-  return clamp01(Math.max(...values.map((value) => value || 0)));
-}
-
 function fpsTone(fps: number) {
   if (fps >= 50) return 'good';
   if (fps >= 30) return 'warn';
   return 'bad';
-}
-
-function formatAudioMotionSignalLabel(key: keyof AudioMotionMonitorSignals) {
-  return key.replace(/^audioMotion/, 'AM ');
 }
 
 function StatusMeter({
@@ -236,26 +228,24 @@ export function AudioMotionDebugPanel({
   }, [gradient, modeOptions, showPeaks]);
 
   const hasMonitorSource = Boolean(audioEngine.audioMonitorNode);
-  const overallEnergy = signalPeak(
-    signals.bass,
-    signals.mid,
-    signals.high,
-    signals.flux,
-    signals.onset,
-  );
   const beatPhase = clamp01(signals.beatPhase ?? 0);
-  const kick = signalPeak(signals.kick, signals.kickEnergy, signals.detectedKick);
-  const snare = signalPeak(signals.band3, signals.band4, signals.onset * 0.65);
-  const analyzerSignalEntries = [
-    ['Centroid', signals.centroid],
-    ['Flux', signals.flux],
-    ['Onset', signals.onset],
-    ['Band 0', signals.band0],
-    ['Band 1', signals.band1],
-    ['Band 2', signals.band2],
-    ['Band 3', signals.band3],
-    ['Band 4', signals.band4],
-    ['Band 5', signals.band5],
+  const debugSignalEntries = [
+    ['bass', signals.bass],
+    ['mid', signals.mid],
+    ['high', signals.high],
+    ['beatPhase', beatPhase],
+    ['kick', signals.kick],
+    ['kickEnergy', signals.kickEnergy],
+    ['detectedKick', signals.detectedKick],
+    ['centroid', signals.centroid],
+    ['flux', signals.flux],
+    ['onset', signals.onset],
+    ['band0', signals.band0],
+    ['band1', signals.band1],
+    ['band2', signals.band2],
+    ['band3', signals.band3],
+    ['band4', signals.band4],
+    ['band5', signals.band5],
   ] as const;
 
   return (
@@ -292,24 +282,18 @@ export function AudioMotionDebugPanel({
           </div>
 
           <div className="debugMeters">
-            <StatusMeter label="Bass energy" value={signals.bass} />
-            <StatusMeter label="Mid energy" value={signals.mid} />
-            <StatusMeter label="Treble energy" value={signals.high} />
-            <StatusMeter label="Overall energy" value={overallEnergy} />
-            <StatusMeter label="BPM beat phase" value={beatPhase} />
-            <StatusMeter label="Kick indicator" value={kick} active={kick > 0.08} />
-            <StatusMeter
-              label="Snare indicator"
-              value={snare}
-              active={snare > 0.12}
-            />
-            {analyzerSignalEntries.map(([label, value]) => (
-              <StatusMeter key={label} label={label} value={value ?? 0} />
+            {debugSignalEntries.map(([key, value]) => (
+              <StatusMeter
+                key={key}
+                label={key}
+                value={value ?? 0}
+                active={key === 'kick' ? (value ?? 0) > 0.08 : undefined}
+              />
             ))}
             {AUDIO_MOTION_SIGNAL_KEYS.map((key) => (
               <StatusMeter
                 key={key}
-                label={formatAudioMotionSignalLabel(key)}
+                label={key}
                 value={monitorSignals[key]}
                 active={
                   key === 'audioMotionKick'

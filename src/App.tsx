@@ -64,6 +64,8 @@ const DUPA_ARCH_KEYS = [
   'topBottomArch',
 ] as const;
 
+const DUPA_GAP_KEYS = ['X_GAP', 'Y_GAP', 'Z_GAP'] as const;
+
 type DupaArchBaselines = Record<(typeof DUPA_ARCH_KEYS)[number], number>;
 
 function dupaArchBaselinesFromParams(params: SketchParams): DupaArchBaselines {
@@ -347,6 +349,18 @@ export function App() {
     (key: string, value: SketchParamValue) => {
       if (selectedSketchId !== 'dupa') {
         setParams((current) => ({ ...current, [key]: value }));
+        return;
+      }
+
+      if (key === 'GAP_MASTER') {
+        const nextGap = Number(value);
+        setParams((current) => ({
+          ...current,
+          GAP_MASTER: nextGap,
+          ...Object.fromEntries(
+            DUPA_GAP_KEYS.map((gapKey) => [gapKey, nextGap]),
+          ),
+        }));
         return;
       }
 
